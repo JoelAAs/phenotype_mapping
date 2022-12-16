@@ -27,7 +27,7 @@ class PredictInteraction:
             mol = mols[0]
             try:
                 if mol["structure_type"] == "MOL":
-                    smile = mol["molecule_structures"]["canonical_smile"]
+                    smile = mol["molecule_structures"]["canonical_smiles"]
                     return smile
                 else:
                     return False

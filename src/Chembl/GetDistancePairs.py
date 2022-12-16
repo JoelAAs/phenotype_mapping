@@ -39,6 +39,7 @@ class GetGeneDistanceAtN:
         distance_pairs = []
         with open(distance_file, "r") as f:
             for line in f:
+                print(line)
                 pair_1, pair_2, distance = line.strip().split("\t")
                 distance_pairs.append(((int(pair_1), int(pair_2)), int(distance)))
         self.distance_pairs = distance_pairs
@@ -207,7 +208,7 @@ class GetGeneDistanceAtN:
     def write_gene_distances(self, output_distance_file):
         with open(output_distance_file, "w") as w:
             for pair, distance in self.distance_pairs:
-                w.write(f"{pair[0]}\t")
+                w.write(f"{pair[0]}\t{pair[1]}\t{distance}\n")
 
 
 
@@ -217,9 +218,9 @@ if __name__ == '__main__':
     args = glob.glob("work/predicted_interaction/chembl/annotated/*csv")
     ppi_network_file = "data/9606.protein.links.v11.5.txt"
     output_folder = "test"
-    output_names = "test/names.csv"
+    output_names = "work/chembl/pairs/name_conversion.csv"
     previous_distances = "test/pair_distance.csv"
 
     Gt = GetGeneDistanceAtN(ppi_network_file, output_folder, output_names, *args)
-    Gt.load_previous_distances(previous_distances, output_names)
-    Gt.get_all_neighbours_at_depth()
+    Gt.calculated_distance_pairs()
+    Gt.write_gene_distances("work/chembl/pairs/distance_pairs.csv")
