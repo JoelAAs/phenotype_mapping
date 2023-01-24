@@ -1,5 +1,6 @@
 import sys
 import pandas
+import pandas as pd
 from chembl_webresource_client.new_client import new_client
 
 
@@ -8,6 +9,7 @@ class ExtraInfo:
         self.ids = targets
         self.targets = new_client.target
         self.target_gene_pairs = []
+        self.full_df = None
 
     def filter(self, target_id):
         filter_kwargs = {
@@ -39,17 +41,18 @@ class ExtraInfo:
         for target_id in self.ids:
             hit = self.filter(target_id)
             if hit is None:
-                self.target_gene_pairs.append((target_id, ["Non-human",]))
+                self.target_gene_pairs.append((target_id, "Non-human"))
             else:
                 genes = self.unpack(hit)
-                self.target_gene_pairs.append((target_id, genes))
+                for gene in genes:
+                    self.target_gene_pairs.append((target_id, gene))
+
+    def merge_csv(self, df_scores):
+        df_target = pd.DataFrame(self.target_gene_pairs, columns=("target", "gene"))
+        self.full_df = df_target.merge(df_scores, on="target")
 
     def write_csv(self, output):
-        with open(output, "w") as w:
-            w.write(f"target\tgene\n")
-            for target_id, genes in self.target_gene_pairs:
-                for gene in genes:
-                    w.write(f"{target_id}\t{gene}\n")
+        self.full_df.to_csv(output, sep="\t", index=False)
 
 
 if __name__ == '__main__':
@@ -58,4 +61,5 @@ if __name__ == '__main__':
     ids = list(df["target"])
     ei = ExtraInfo(targets=ids)
     ei.append()
+    ei.merge_csv(df)
     ei.write_csv(args[1])

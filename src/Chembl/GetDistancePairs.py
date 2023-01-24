@@ -1,49 +1,66 @@
 import igraph as ig
 import pandas as pd
 import ensembl_rest
-from itertools import combinations
 import requests
 from ensembl_rest import HTTPError
-import numpy as np
 import multiprocessing as mp
+import os
 
 
-def _get_depth_of_pair(pair, graph):
-    depth = len(graph.get_all_shortest_paths(pair[0], pair[1])[0])
-    return depth
+def _write_part_depth(pairs, graph, pro_n, name_dict):
+    i = 0
+    with open(f"tmp/part_{pro_n}", "w") as w:
+        for pair in pairs:
+            depth = len(graph.get_all_shortest_paths(pair[0], pair[1])[0])
+            i += 1
+            if i % 100 == 0:
+                print(f"Finished {round(i / len(pairs) * 100)} % of process {pro_n}")
+            w.write(f"{name_dict[pair[0]]}\t{name_dict[pair[1]]}\t{depth}\n")
 
 
 class GetGeneDistanceAtN:
-    def __init__(self, ppi_network_file, output_folder, output_names, *args):
+    def __init__(self, ppi_network_file, output_folder, output_names, combination_file):
         self.graph = self.setup_network(ppi_network_file)
         self.output_folder = output_folder
         self.output_names = output_names
-        self.args = args
+        self.combination_file = combination_file
+        self.named_gene_pairs = None
         self.gene_names = []
         self.string_ids = []
+        self.translation_dict_gene = None
+        self.translation_dict_index = None
+        self.translation_dict_string = None
         self.network_index = []
         self.name_df = []
         self.gene_pairs = []
         self.distance_pairs = []
 
     def calculated_distance_pairs(self):
-        self.gene_names = self.get_all_human_genes_set(self.args)
+        self.named_gene_pairs = self.get_all_human_genes_set(self.combination_file)
+        self.gene_names = list(set([gene_name for pair in self.named_gene_pairs for gene_name in pair]))
         print(f"{len(self.gene_names)} unique genes loaded")
-        self.string_ids = self.get_stringdb_identifiers()
-        self.network_index = self.get_network_index()
+        self.string_ids, self.translation_dict_gene = self.get_stringdb_identifiers()
+        self.network_index, self.translation_dict_index, self.translation_dict_string = self.get_network_index()
         self.name_df = self.write_name_df(self.output_names)
-        self.gene_pairs = [(a, b) for a, b in combinations(self.network_index, 2)]
+        t = lambda x: self.translation_dict_index[self.translation_dict_gene[x]]
+        self.gene_pairs = [(t(a), t(b)) for a, b in self.named_gene_pairs]
         self.distance_pairs = self.set_depth_of_pairs()
 
     def load_previous_distances(self, distance_file, name_df):
         distance_pairs = []
+        self.name_df = pd.read_csv(name_df, sep="\t")
+        translation_dict = dict()
+        for i, gene_id, string_id, index_id in self.name_df.itertuples():
+            translation_dict.update({string_id: int(index_id)})
+        self.translation_dict_index = translation_dict
         with open(distance_file, "r") as f:
             for line in f:
-                print(line)
                 pair_1, pair_2, distance = line.strip().split("\t")
-                distance_pairs.append(((int(pair_1), int(pair_2)), int(distance)))
+                distance_pairs.append((
+                    (self.translation_dict_index[pair_1],
+                     self.translation_dict_index[pair_2]), int(distance)))
+        print(distance_pairs)
         self.distance_pairs = distance_pairs
-        self.name_df = pd.read_csv(name_df, sep="\t")
 
     """
     Gets all indexes for nodes based on ensembl ids
@@ -51,24 +68,31 @@ class GetGeneDistanceAtN:
 
     def get_network_index(self):
         network_indexes = []
+        translation_dict = dict()
+        translation_string = dict()
         for string_id in self.string_ids:
             index = self.graph.vs.find(string_id).index
             network_indexes.append(index)
-        return network_indexes
+            translation_dict.update({string_id: index})
+            translation_string.update({index: string_id})
+        return network_indexes, translation_dict, translation_string
 
     def get_stringdb_identifiers(self):
         string_ids = []
+        translation_dict = dict()
         for gene in self.gene_names:
             print(f"looking up string id for {gene}")
             url = "https://string-db.org/api/json/get_string_ids?identifiers={gene}&species=9606"
             response = requests.get(url.format(gene=gene))
             if response.ok:
                 data = response.json()
-                string_ids.append(data[0]["stringId"])
+                sid = data[0]["stringId"]
+                string_ids.append(sid)
+                translation_dict.update({gene: sid})
             else:
                 raise HTTPError(response.text + f" for {gene}")
 
-        return string_ids
+        return string_ids, translation_dict
 
     """
     Queries Ensembl for ids based on gene names from Chembl
@@ -108,15 +132,10 @@ class GetGeneDistanceAtN:
     """
 
     @staticmethod
-    def get_all_human_genes_set(df_tuple):
-        gene_set = set()
-        for arg in df_tuple:
-            gene_interaction_df = pd.read_csv(arg, sep="\t")
-            gene_set.update(
-                {gene for gene in gene_interaction_df["gene"] if gene != "Non-human"}
-            )
-
-        return list(gene_set)
+    def get_all_human_genes_set(combination_file):
+        df_combinations = pd.read_csv(combination_file, sep="\t")
+        gene_interactions = [(a, b) for i, a, b in df_combinations.itertuples()]
+        return gene_interactions
 
     # We assume node/node/weight columns
     @staticmethod
@@ -132,13 +151,37 @@ class GetGeneDistanceAtN:
         return graph
 
     def set_depth_of_pairs(self):
-        with mp.Pool(mp.cpu_count() - 1) as pool:
-            star_args = [(pair, self.graph) for pair in self.gene_pairs]
-            distances = pool.starmap(
-                _get_depth_of_pair, star_args
-            )
+        os.mkdir("tmp")
+        n_cores = mp.cpu_count() - 2
 
-        distance_pairs = list(zip(self.gene_pairs, distances))
+        def _binit(inlist, steps, step_len, current_step, outlist):
+            if current_step == steps:
+                return outlist + [inlist]
+            outlist = outlist + [inlist[0:step_len]]
+            return _binit(inlist[step_len:], steps, step_len, current_step + 1, outlist)
+
+        parts = 100
+        binned_pairs = _binit(self.gene_pairs, parts, int(len(self.gene_pairs) / parts), 0, [])
+
+        pool = mp.Pool(n_cores)
+        processes = [pool.apply_async(
+            _write_part_depth,
+            args=(part,
+                  self.graph,
+                  i,
+                  self.translation_dict_string))
+            for i, part in enumerate(binned_pairs)]
+
+        for process in processes:
+            process.get()
+        pool.close()
+
+        distance_pairs = []
+        for i in range(parts+1):
+            with open(f"tmp/part_{i}", "r") as f:
+                for line in f:
+                    gene_from, gene_to, depth = line.strip().split("\t")
+                    distance_pairs.append(((gene_from, gene_to), int(depth)))
 
         return distance_pairs
 
@@ -176,6 +219,7 @@ class GetGeneDistanceAtN:
                 gene_vertex["name"]: [self._get_neighbours_at_depth(ni, n - 1, visited) for ni in current_neighbours]}
 
     def write_name_df(self, output_names, write=True):
+        print("writing name file")
         df = pd.DataFrame(
             {"gene_name": self.gene_names,
              "string_id": self.string_ids,
@@ -188,8 +232,11 @@ class GetGeneDistanceAtN:
 
     def format_to_csv(self, gene_dict, depth, output):
         output.write("\t".join(map(str, range(depth))) + "\n")
-        gene = list(gene_dict.keys())[0]  # the root is always a single gene
-        self._format_to_line(gene, gene_dict, output, list())
+        if depth == 1:
+            output.write(gene_dict + "\n")
+        else:
+            gene = list(gene_dict.keys())[0]  # the root is always a single gene
+            self._format_to_line(gene, gene_dict, output, list())
 
     def _format_to_line(self, gene, gene_dict, output, previous):
         previous += [gene]
@@ -206,10 +253,11 @@ class GetGeneDistanceAtN:
                     self._format_to_line(gene_name, next_gene, output, next_previous)
 
     def write_gene_distances(self, output_distance_file):
+        print("writing distance file")
         with open(output_distance_file, "w") as w:
             for pair, distance in self.distance_pairs:
                 w.write(f"{pair[0]}\t{pair[1]}\t{distance}\n")
-
+        print("done writing distance file")
 
 
 if __name__ == '__main__':
