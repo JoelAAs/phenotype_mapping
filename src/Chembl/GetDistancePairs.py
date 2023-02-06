@@ -19,7 +19,7 @@ def _write_part_depth(pairs, graph, pro_n, name_dict):
 
 
 class GetGeneDistanceAtN:
-    def __init__(self, ppi_network_file, output_folder, output_names, combination_file):
+    def __init__(self, ppi_network_file, output_folder, output_names, combination_file, missing_filename):
         self.graph = self.setup_network(ppi_network_file)
         self.output_folder = output_folder
         self.output_names = output_names
@@ -34,6 +34,7 @@ class GetGeneDistanceAtN:
         self.name_df = []
         self.gene_pairs = []
         self.distance_pairs = []
+        self.missing = missing_filename
 
     def calculated_distance_pairs(self):
         self.named_gene_pairs = self.get_all_human_genes_set(self.combination_file)
@@ -41,10 +42,24 @@ class GetGeneDistanceAtN:
         print(f"{len(self.gene_names)} unique genes loaded")
         self.string_ids, self.translation_dict_gene = self.get_stringdb_identifiers()
         self.network_index, self.translation_dict_index, self.translation_dict_string = self.get_network_index()
+        self.remove_failed_names()
         self.name_df = self.write_name_df(self.output_names)
         t = lambda x: self.translation_dict_index[self.translation_dict_gene[x]]
         self.gene_pairs = [(t(a), t(b)) for a, b in self.named_gene_pairs]
         self.distance_pairs = self.set_depth_of_pairs()
+
+    def remove_failed_names(self):
+        failed = pd.read_csv(self.missing, sep="\t")
+        pairs = []
+        for a, b in self.named_gene_pairs:
+            if not (a in failed.name or b in failed.name):
+                try:
+                    _ = self.translation_dict_index[self.translation_dict_gene[a]]
+                    _ = self.translation_dict_index[self.translation_dict_gene[b]]
+                    pairs.append((a, b))
+                except KeyError:
+                    pass
+        self.named_gene_pairs = pairs
 
     def load_previous_distances(self, distance_file, name_df):
         distance_pairs = []
@@ -70,27 +85,40 @@ class GetGeneDistanceAtN:
         network_indexes = []
         translation_dict = dict()
         translation_string = dict()
+        missing = open(self.missing, "a")
         for string_id in self.string_ids:
-            index = self.graph.vs.find(string_id).index
-            network_indexes.append(index)
-            translation_dict.update({string_id: index})
-            translation_string.update({index: string_id})
+            try:
+                index = self.graph.vs.find(string_id).index
+                network_indexes.append(index)
+                translation_dict.update({string_id: index})
+                translation_string.update({index: string_id})
+            except ValueError:
+                missing.write(f"{string_id}\tvertex missing\n")
+
+        missing.close()
         return network_indexes, translation_dict, translation_string
 
     def get_stringdb_identifiers(self):
         string_ids = []
         translation_dict = dict()
+        url = "https://string-db.org/api/json/get_string_ids?identifiers={gene}&species=9606"
+        missing = open(self.missing, "w")
+        missing.write("name\treason\n")
+        print(f"there are {len(self.gene_names)} unique genes")
         for gene in self.gene_names:
-            print(f"looking up string id for {gene}")
-            url = "https://string-db.org/api/json/get_string_ids?identifiers={gene}&species=9606"
             response = requests.get(url.format(gene=gene))
+            print(f"looking up string id for {gene}")
             if response.ok:
                 data = response.json()
-                sid = data[0]["stringId"]
-                string_ids.append(sid)
-                translation_dict.update({gene: sid})
+                if data:
+                    sid = data[0]["stringId"]
+                    string_ids.append(sid)
+                    translation_dict.update({gene: sid})
+                else:
+                    missing.write(f"{gene}\tnot in stringdb\n")
             else:
                 raise HTTPError(response.text + f" for {gene}")
+        missing.close()
 
         return string_ids, translation_dict
 
@@ -152,7 +180,7 @@ class GetGeneDistanceAtN:
 
     def set_depth_of_pairs(self):
         os.mkdir("tmp")
-        n_cores = mp.cpu_count() - 2
+        n_cores = mp.cpu_count()
 
         def _binit(inlist, steps, step_len, current_step, outlist):
             if current_step == steps:
@@ -177,7 +205,7 @@ class GetGeneDistanceAtN:
         pool.close()
 
         distance_pairs = []
-        for i in range(parts+1):
+        for i in range(parts + 1):
             with open(f"tmp/part_{i}", "r") as f:
                 for line in f:
                     gene_from, gene_to, depth = line.strip().split("\t")
@@ -220,12 +248,19 @@ class GetGeneDistanceAtN:
 
     def write_name_df(self, output_names, write=True):
         print("writing name file")
-        df = pd.DataFrame(
-            {"gene_name": self.gene_names,
-             "string_id": self.string_ids,
-             "network_index": self.network_index
-             }
-        )
+        rows = []
+        for gene in self.gene_names:
+            try:
+                rows.append({
+                    "gene_name": gene,
+                    "string_id": self.translation_dict_gene[gene],
+                    "network_index": self.translation_dict_index[self.translation_dict_gene[gene]]
+                })
+
+            except KeyError:
+                pass
+
+        df = pd.DataFrame(rows)
         if write:
             df.to_csv(output_names, index=False, sep="\t")
         return df
@@ -258,17 +293,3 @@ class GetGeneDistanceAtN:
             for pair, distance in self.distance_pairs:
                 w.write(f"{pair[0]}\t{pair[1]}\t{distance}\n")
         print("done writing distance file")
-
-
-if __name__ == '__main__':
-    import glob
-
-    args = glob.glob("work/predicted_interaction/chembl/annotated/*csv")
-    ppi_network_file = "data/9606.protein.links.v11.5.txt"
-    output_folder = "test"
-    output_names = "work/chembl/pairs/name_conversion.csv"
-    previous_distances = "test/pair_distance.csv"
-
-    Gt = GetGeneDistanceAtN(ppi_network_file, output_folder, output_names, *args)
-    Gt.calculated_distance_pairs()
-    Gt.write_gene_distances("work/chembl/pairs/distance_pairs.csv")

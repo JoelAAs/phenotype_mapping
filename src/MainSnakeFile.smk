@@ -1,7 +1,7 @@
 import pandas as pd
 from itertools import combinations
 include: "Chembl/Snakefile_chmbl_prediction.smk"
-
+include: "HPO/Snakefile_HPO_network.smk"
 
 ### Drugs
 def  get_all_medication(file_csv):
@@ -23,4 +23,6 @@ rule all:
         #"work/chembl/pairs/distance_pairs_possible_ends.csv"
         #expand("work/chembl/predicted_interaction/annotated/{drug}.csv", drug = drugs),
         #combination_input
-        "work/chembl/distances/summed_scores.csv"
+        #"work/chembl/distances/summed_scores.csv"
+        #"work/HPO/gene_interactions/unique.csv"
+        "work/HPO/pairs/name_conversion.csv"
