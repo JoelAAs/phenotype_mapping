@@ -1,7 +1,7 @@
 import sys
 import pandas as pd
-from HPO.GetHPOGenes import GetHPOGenes
-from Chembl.GetDistancePairs import GetGeneDistanceAtN
+from GetHPOGenes import GetHPOGenes
+from testHPO_paralleled import GetGeneDistanceAtN
 from itertools import combinations
 import re
 import os
@@ -16,7 +16,7 @@ def  get_all_hpos(file_csv):
     return sorted_hpo_combinations, hpos
 
 hpo_combinations, all_hpos = get_all_hpos("data/MatchedHPO.csv")
-combination_input = ["work/HPO/distances/{}_{}_all.csv.bz2".format(comb[0], comb[1]) for comb in drug_combinations]
+combination_input = ["work/HPO/distances/{}_{}_all.csv.bz2".format(comb[0], comb[1]) for comb in hpo_combinations]
 
 wildcard_constraints:
     hpo="[A-Za-z0-9.: \-()]+"
@@ -26,31 +26,31 @@ wildcard_constraints:
 
 
 ### Input functions
-# 
-# def get_all_genes_at_depth(wc):
-# 
-#     all_needed_files_exists = all(
-#         map(
-#             os.path.exists,
-#         [
-#             "work/HPO/gene_path",
-#             "work/HPO/pairs/name_conversion.csv",
-#             "work/HPO/pairs/distance_pairs.csv"]))
-#     if not all_needed_files_exists:
-#         re_eval = checkpoints.get_possible_paths_from_genes.get()
-#     else:
-#         df_distance_pairs = pd.read_csv("work/chembl/pairs/distance_pairs.csv", sep = "\t", header=None)
-#         expected_distance = []
-#         for i, gene_a, gene_b, depth in df_distance_pairs.itertuples():
-#             expected_distance.append(
-#                 f"work/chembl/gene_path/{gene_a}_at_{depth}_shortest.csv.bz2"
-#             )
-#             expected_distance.append(
-#                 f"work/chembl/gene_path/{gene_b}_at_{depth}_shortest.csv.bz2"
-#             )
-# 
-#         return expected_distance
-# 
+
+def get_all_genes_at_depth(wc):
+
+    all_needed_files_exists = all(
+        map(
+            os.path.exists,
+        [
+            "work/HPO/gene_path",
+            "work/HPO/pairs/name_conversion.csv",
+            "work/HPO/pairs/distance_pairs.csv"]))
+    if not all_needed_files_exists:
+        re_eval = checkpoints.get_possible_paths_from_genes.get()
+    else:
+        df_distance_pairs = pd.read_csv("work/HPO/pairs/distance_pairs.csv", sep = "\t", header=None)
+        expected_distance = []
+        for i, gene_a, gene_b, depth in df_distance_pairs.itertuples():
+            expected_distance.append(
+                f"work/HPO/gene_path/{gene_a}_at_{depth}_shortest.csv.bz2"
+            )
+            expected_distance.append(
+                f"work/HPO/gene_path/{gene_b}_at_{depth}_shortest.csv.bz2"
+            )
+
+        return expected_distance
+
 # rule get_scores:
 #     input:
 #         distances = combination_input
@@ -132,91 +132,149 @@ wildcard_constraints:
 #         df_all = pd.concat([df_all_first, df_all_flip])
 #         df_all.to_csv(output.all_distances, sep="\t", index = False)
 # 
+
+rule calculate_gene_distance:
+    input:
+        all_unique = "work/HPO/pairs/distance_pairs.csv",
+        genes = lambda wildcards: get_all_genes_at_depth(wildcards)
+    output:
+        distance = "work/HPO/pairs/distance_pairs_possible_ends.csv"
+    run:
+        def _get_depth(gene, target, depth, suffix):
+            df_path = pd.read_csv(
+                f"work/HPO/gene_path/{gene}_at_{depth}_shortest.csv.bz2",
+                sep="\t"
+            )
+            number_hits = sum(df_path.iloc[:, -1] == target)
+            number_of_paths = len(df_path.index)
+            return {
+                f"hits{suffix}": number_hits,
+                f"total_paths{suffix}": number_of_paths,
+                f"weight{suffix}": number_hits/number_of_paths
+            }
+
+        df_unique = pd.read_csv(input.all_unique, sep = "\t", header=None)
+        expected_distance = []
+        tot_rows = len(df_unique)
+        for i, gene_a, gene_b, depth in df_unique.itertuples():
+            row = {
+                "from": gene_a,
+                "to": gene_b,
+                "depth": depth
+            }
+            row.update(
+                _get_depth(gene_a, gene_b, depth, "_a")
+            )
+            row.update(
+                _get_depth(gene_b, gene_a, depth, "_b")
+            )
+            expected_distance.append(row)
+            print(f"{i}/{tot_rows} rows: {round(i/tot_rows, 3)*100} % done", end="\r")
+
+        df = pd.DataFrame(expected_distance)
+        df.to_csv(output.distance, sep = "\t", index=False)
+
+
+rule guarantee_shortest_path:
+    input:
+        gene = "work/HPO/gene_path/{geneb}_at_{depth}.csv"
+    output:
+        gene = "work/HPO/gene_path/{geneb}_at_{depth}_shortest.csv.bz2"
+    run:
+        possible_paths = pd.read_csv(input.gene, sep = "\t")
+        visited = possible_paths.iloc[:, :-1].unstack().unique()
+        shortest_paths = possible_paths[~possible_paths.iloc[:, -1].isin(visited)]
+        shortest_paths.to_csv(output.gene, sep = "\t", index=False)
 # 
-# rule calculate_gene_distance:
-#     input:
-#         all_unique = "work/chembl/pairs/distance_pairs.csv",
-#         genes = lambda wildcards: get_all_genes_at_depth(wildcards)
-#     output:
-#         distance = "work/chembl/pairs/distance_pairs_possible_ends.csv"
-#     run:
-#         def _get_depth(gene, target, depth, suffix):
-#             df_path = pd.read_csv(
-#                 f"work/chembl/gene_path/{gene}_at_{depth}_shortest.csv.bz2",
-#                 sep="\t"
-#             )
-#             number_hits = sum(df_path.iloc[:, -1] == target)
-#             number_of_paths = len(df_path.index)
-#             return {
-#                 f"hits{suffix}": number_hits,
-#                 f"total_paths{suffix}": number_of_paths,
-#                 f"weight{suffix}": number_hits/number_of_paths
-#             }
-# 
-#         df_unique = pd.read_csv(input.all_unique, sep = "\t", header=None)
-#         expected_distance = []
-#         tot_rows = len(df_unique)
-#         for i, gene_a, gene_b, depth in df_unique.itertuples():
-#             row = {
-#                 "from": gene_a,
-#                 "to": gene_b,
-#                 "depth": depth
-#             }
-#             row.update(
-#                 _get_depth(gene_a, gene_b, depth, "_a")
-#             )
-#             row.update(
-#                 _get_depth(gene_b, gene_a, depth, "_b")
-#             )
-#             expected_distance.append(row)
-#             print(f"{i}/{tot_rows} rows: {round(i/tot_rows, 3)*100} % done", end="\r")
-# 
-#         df = pd.DataFrame(expected_distance)
-#         df.to_csv(output.distance, sep = "\t", index=False)
-# 
-# 
-# rule guarantee_shortest_path:
-#     input:
-#         gene = "work/chembl/gene_path/{geneb}_at_{depth}.csv"
-#     output:
-#         gene = "work/chembl/gene_path/{geneb}_at_{depth}_shortest.csv.bz2"
-#     run:
-#         possible_paths = pd.read_csv(input.gene, sep = "\t")
-#         visited = possible_paths.iloc[:, :-1].unstack().unique()
-#         shortest_paths = possible_paths[~possible_paths.iloc[:, -1].isin(visited)]
-#         shortest_paths.to_csv(output.gene, sep = "\t", index=False)
-# 
-# checkpoint get_possible_paths_from_genes:
-#     input:
-#         ppi_network_file = "data/9606.protein.links.v11.5.txt",
-#         distance_pairs = "work/chembl/pairs/distance_pairs.csv",
-#         names = "work/chembl/pairs/name_conversion.csv"
-#     output:
-#         directory("work/chembl/gene_path")
-#     run:
-#         shell("mkdir -p {output}")
-#         gp = GetGeneDistanceAtN(input.ppi_network_file, output[0], "", [])
-#         gp.load_previous_distances(input.distance_pairs, input.names)
-#         gp.get_all_neighbours_at_depth()
-# 
-# 
-rule get_gene_depth_pairs_HPO:
+checkpoint get_possible_paths_from_genes:
+    input:
+        ppi_network_file = "data/9606.protein.links.v11.5.txt",
+        unique_depth = "work/HPO/pairs/unique_depth.csv",
+    output:
+        directory("work/HPO/gene_path")
+    shell:
+        """
+        mkdir -p {output}
+        python src/HPO/get_all_paths.py {input.unique_depth} {input.ppi_network_file} {output}
+        """
+
+
+rule get_all_unique_depth:
+    input:
+        ppi_network_file = "data/9606.protein.links.v11.5.txt",
+        distance_pairs = "work/HPO/pairs/distance_pairs.csv",
+        names = "work/HPO/pairs/name_conversion.csv"
+    output:
+        all_unique_depths="work/HPO/pairs/unique_depth.csv"
+    run:
+        gp = GetGeneDistanceAtN(input.ppi_network_file)
+        gp.load_string_identifiers(input.names)
+        gp.load_previous_distances(input.distance_pairs)
+        gp.get_all_at_depth(output.all_unique_depths)
+
+
+n_parts = 100
+
+rule distance_pairs_collect:
+    input:
+        distance_pairs = expand("work/HPO/pairs/distance_pairs_{i}.csv", i=range(n_parts))
+    output:
+        "work/HPO/pairs/distance_pairs.csv"
+    shell:
+        """
+        awk 'FNR > 1' {input.distance_pairs} >> {output}
+        """
+
+
+rule get_gene_depth_pairs_HPO_part:
     """
     parallelled
     """
     input:
         ppi_network_file = "data/9606.protein.links.v11.5.txt",
-        unique_interactions = "work/HPO/gene_interactions/unique_{i}.csv"
+        unique_interactions = "work/HPO/gene_interactions/unique_{i}.csv",
+        names= "work/HPO/pairs/name_conversion.csv",
+        missing= "work/HPO/pairs/missing.csv"
     output:
-        distance_pairs = "work/HPO/pairs/distance_pairs_{i}.csv",
-        names = "work/HPO/pairs/name_conversion_{i}.csv",
-        missing = "work/HPO/pairs/missing_{i}.csv"
-    threads:
-        workflow.cores
+        distance_pairs = "work/HPO/pairs/distance_pairs_{i}.csv"
+
     run:
-        gp = GetGeneDistanceAtN(input.ppi_network_file, "", output.names, input.unique_interactions, output.missing)
+        gp = GetGeneDistanceAtN(input.ppi_network_file)
+        gp.set_tmpdir(f"work/HPO/pairs/tmp_{wildcards.i}")
+        gp.set_missing(input.missing)
+        gp.load_combinations(input.unique_interactions)
+        gp.load_string_identifiers(input.names)
         gp.calculated_distance_pairs()
         gp.write_gene_distances(output.distance_pairs)
+
+
+rule get_unq_parts:
+    input:
+        unique = "work/HPO/gene_interactions/unique.csv"
+    output:
+        parts = expand("work/HPO/gene_interactions/unique_{i}.csv", i = range(n_parts))
+    run:
+        df_all = pd.read_csv(input.unique, sep = "\t")
+        n_parts = len(output.parts)
+        nrows = len(df_all.index)
+        step = int(nrows/n_parts)
+        part_row = range(0, nrows, step)
+        for i, current in enumerate(output.parts):
+            df_all.iloc[range(part_row[i], part_row[i+1])].to_csv(current, index = False, sep="\t")
+
+rule get_name_df_hpo:
+    input:
+        ppi_network_file = "data/9606.protein.links.v11.5.txt",
+        unique ="work/HPO/gene_interactions/unique.csv"
+    output:
+        names = "work/HPO/pairs/name_conversion.csv",
+        missing = "work/HPO/pairs/missing.csv"
+    run:
+
+        gp = GetGeneDistanceAtN(input.ppi_network_file)
+        gp.set_missing(output.missing)
+        gp.get_format_string_identifiers(input.unique)
+        gp.write_name_df(output.names)
 
 rule get_unique_gene_interaction_hpo:
     input:
