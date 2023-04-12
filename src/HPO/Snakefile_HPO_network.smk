@@ -43,10 +43,10 @@ def get_all_genes_at_depth(wc):
         expected_distance = []
         for i, gene_a, gene_b, depth in df_distance_pairs.itertuples():
             expected_distance.append(
-                f"work/HPO/gene_path/{gene_a}_at_{depth}_shortest.csv.bz2"
+                f"work/HPO/gene_path/{gene_a}_at_{depth}_sum.csv.bz2"
             )
             expected_distance.append(
-                f"work/HPO/gene_path/{gene_b}_at_{depth}_shortest.csv.bz2"
+                f"work/HPO/gene_path/{gene_b}_at_{depth}_sum.csv.bz2"
             )
 
         return expected_distance
@@ -136,44 +136,62 @@ def get_all_genes_at_depth(wc):
 rule calculate_gene_distance:
     input:
         all_unique = "work/HPO/pairs/distance_pairs.csv",
-        genes = lambda wildcards: get_all_genes_at_depth(wildcards)
+        gene_files = "work/HPO/gene_path/all_genes_at_depth.txt"
     output:
         distance = "work/HPO/pairs/distance_pairs_possible_ends.csv"
     run:
-        def _get_depth(gene, target, depth, suffix):
+        def _get_depth(gene, target, depth):
             df_path = pd.read_csv(
                 f"work/HPO/gene_path/{gene}_at_{depth}_shortest.csv.bz2",
                 sep="\t"
             )
             number_hits = sum(df_path.iloc[:, -1] == target)
             number_of_paths = len(df_path.index)
-            return {
-                f"hits{suffix}": number_hits,
-                f"total_paths{suffix}": number_of_paths,
-                f"weight{suffix}": number_hits/number_of_paths
-            }
+            return [
+                number_hits,
+                number_of_paths,
+                number_hits/number_of_paths
+                ]
 
         df_unique = pd.read_csv(input.all_unique, sep = "\t", header=None)
-        expected_distance = []
         tot_rows = len(df_unique)
-        for i, gene_a, gene_b, depth in df_unique.itertuples():
-            row = {
-                "from": gene_a,
-                "to": gene_b,
-                "depth": depth
-            }
-            row.update(
-                _get_depth(gene_a, gene_b, depth, "_a")
-            )
-            row.update(
-                _get_depth(gene_b, gene_a, depth, "_b")
-            )
-            expected_distance.append(row)
-            print(f"{i}/{tot_rows} rows: {round(i/tot_rows, 3)*100} % done", end="\r")
+        with open(output.distance, "w") as w:
+            for i, gene_a, gene_b, depth in df_unique.itertuples():
+                hit_b, tot_path_b, weight_b = _get_depth(gene_b, gene_a, depth)
+                hit_a, tot_path_a, weight_a = _get_depth(gene_a, gene_b, depth)
+                print(f"{i}/{tot_rows} rows: {round(i/tot_rows, 3)*100} % done", end="\r")
+                w.write(f"{gene_a}\t{gene_b}\t{depth}\t{hit_a}\t{tot_path_a}\t{weight_a}\t{hit_b}\t{tot_path_b}\t{weight_b}\t")
 
-        df = pd.DataFrame(expected_distance)
-        df.to_csv(output.distance, sep = "\t", index=False)
+rule get_list_of_all_gene_depths:
+    input:
+        genes = lambda wildcards: get_all_genes_at_depth(wildcards)
+    output:
+        expected_output = "work/HPO/gene_path/all_genes_at_depth.txt"
+    run:
+        with open(output.expected_output, "w") as w:
+            for gene in input.genes:
+                w.write(f"{gene}\n")
 
+rule possible_end_points:
+    input:
+        full_paths = "work/HPO/gene_path/{gene}_at_{depth}_shortest.csv.bz2"
+    output:
+        summed_paths = "work/HPO/gene_path/{gene}_at_{depth}_sum.csv.bz2"
+    run:
+        gene_count = dict()
+        with bz2.open(input.full_paths, "r") as f:
+            for line in f:
+                line = line.decode("utf-8").strip().split()
+                path_end = line[-1]
+                if path_end in gene_count:
+                    gene_count[path_end] += 1
+                else:
+                    gene_count[path_end] = 1
+
+        with bz2.open(output.summed_paths, "wt") as w:
+            w.write("Gene\tCount\n")
+            for gene, count in gene_count.items():
+                w.write(f"{gene}\t{count}\n")
 
 rule guarantee_shortest_path:
     input:
