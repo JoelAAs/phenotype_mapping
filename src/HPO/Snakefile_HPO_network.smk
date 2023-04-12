@@ -141,12 +141,16 @@ rule calculate_gene_distance:
         distance = "work/HPO/pairs/distance_pairs_possible_ends.csv"
     run:
         def _get_depth(gene, target, depth):
-            df_path = pd.read_csv(
-                f"work/HPO/gene_path/{gene}_at_{depth}_shortest.csv.bz2",
-                sep="\t"
-            )
-            number_hits = sum(df_path.iloc[:, -1] == target)
-            number_of_paths = len(df_path.index)
+            with bz2.open(f"work/HPO/gene_path/{gene}_at_{depth}_sum.csv.bz2", "r") as f:
+                number_of_paths = 0
+                number_hits = 0
+                all_lines = f.readlines()
+                for gene_path_line in all_lines[1:]:
+                    gene_path_line = gene_path_line.decode("utf-8").strip().split()
+                    if gene_path_line[0] == target:
+                        number_hits = gene_path_line[1]
+                    number_of_paths += int(gene_path_line[1])
+
             return [
                 number_hits,
                 number_of_paths,
