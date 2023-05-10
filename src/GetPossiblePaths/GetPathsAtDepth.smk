@@ -2,21 +2,25 @@ import pandas as pd
 import bz2
 
 checkpoint get_possible_paths_from_genes:
+    params:
+        max_depth = config["max_depth"]
     input:
         ppi_network_file = "data/9606.protein.links.v11.5.txt",
-        unique_depth = "work/{project}/depth/unique.csv"
+        unique_genes = "work/{project}/gene_interactions/unique_genes.csv"
     output:
         directory("work/{project}/gene_path")
+    singularity:
+        "data/igraph.simg"
     shell:
         """
         mkdir -p {output}
-        python src/GetPossiblePaths/GetPossiblePaths.py {input.unique_depth} {input.ppi_network_file} {output}
+        python src/GetPossiblePaths/GetPossiblePaths.py {input.unique_genes} {input.ppi_network_file} {output} {params.max_depth}
         """
 
 
 rule guarantee_shortest_path:
     input:
-        gene = temp("work/{project}/gene_path/{gene}_at_{depth}.csv")
+        gene = "work/{project}/gene_path/{gene}_at_{depth}.csv"
     output:
         gene = "work/{project}/gene_path/{gene}_at_{depth}_shortest.csv.bz2"
     run:
@@ -26,7 +30,7 @@ rule guarantee_shortest_path:
         shortest_paths.to_csv(output.gene, sep = "\t", index=False)
 
 
-rule possible_end_points:
+rule possible_endpoints:
     input:
         full_paths = "work/{project}/gene_path/{gene}_at_{depth}_shortest.csv.bz2"
     output:
@@ -34,13 +38,17 @@ rule possible_end_points:
     run:
         gene_count = dict()
         with bz2.open(input.full_paths, "r") as f:
+            header = True
             for line in f:
-                line = line.decode("utf-8").strip().split()
-                path_end = line[-1]
-                if path_end in gene_count:
-                    gene_count[path_end] += 1
+                if header:
+                    header = False
                 else:
-                    gene_count[path_end] = 1
+                    line = line.decode("utf-8").strip().split()
+                    path_end = line[-1]
+                    if path_end in gene_count:
+                        gene_count[path_end] += 1
+                    else:
+                        gene_count[path_end] = 1
 
         with bz2.open(output.summed_paths, "wt") as w:
             w.write("Gene\tCount\n")

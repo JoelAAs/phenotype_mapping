@@ -1,0 +1,4 @@
+project: "test"
+input_location: "input"
+ppi_file: "data/9606.protein.links.v11.5.txt"
+depth_parts: 1

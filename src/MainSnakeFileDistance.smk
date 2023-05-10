@@ -1,6 +1,6 @@
 include: "GeneCombinations/GetTermPairs.smk"
-include: "GetGeneDepth/GetGeneDepths.smk"
-include: "GetGeneDepth/GetUniqueGeneDepthPairs.smk"
+#include: "GetGeneDepth/GetGeneDepths.smk"
+#include: "GetGeneDepth/GetUniqueGeneDepthPairs.smk"
 include: "GetPossiblePaths/GetPathsAtDepth.smk"
 include: "AggregateDistances/CalculateTermDistance.smk"
 include: "AggregateDistances/CalculateGeneDistance.smk"
