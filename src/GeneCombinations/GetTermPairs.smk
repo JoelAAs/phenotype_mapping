@@ -18,7 +18,7 @@ term_combinations = combinations(term_combinations, 2)
 rule get_term_interaction_gene_interaction:
     input:
         term_a = "{input_location}/{{project}}/{{term_a}}.csv".format(input_location=config["input_location"]),
-        term_b= "{input_location}/{{project}}/{{term_b}}.csv".format(input_location=config["input_location"])
+        term_b = "{input_location}/{{project}}/{{term_b}}.csv".format(input_location=config["input_location"])
     output:
         gene_interactions = "work/{project}/gene_interactions/{term_a}_{term_b}.csv.bz2"
     run:

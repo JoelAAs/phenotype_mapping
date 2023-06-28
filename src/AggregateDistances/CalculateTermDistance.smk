@@ -9,7 +9,8 @@ rule calculate_term_distances:
         term_a = "{input_location}/{{project}}/{{term_a}}.csv".format(input_location=config['input_location']),
         term_b = "{input_location}/{{project}}/{{term_b}}.csv".format(input_location=config['input_location'])
     output:
-        term_distance = "work/{project}/gene_distance/{term_a}_{term_b}.csv"
+        term_distance = "work/{project}/gene_distance/{term_a}_{term_b}.csv",
+        gene_distances = "work/{project}/gene_specific/{term_a}_{term_b}_score.csv"
     run:
         def get_score(df_all, from_genes, depth):
             path_summed = df_all[df_all["from"].isin(from_genes)][df_all["depth"] == depth].paths.sum()
@@ -19,16 +20,20 @@ rule calculate_term_distances:
             return path_summed / tot_paths
 
         df_distance = pd.read_csv(input.gene_distances, sep="\t")
+        df_distance = df_distance[~df_distance.duplicated()] # duplicate rows introduced CalculateGeneDistance:100
+        df_distance = df_distance[df_distance.depth != -1] # remove those to far away
         df_from_to = pd.read_csv(input.from_to, sep="\t")
         df_rev = df_from_to.rename(columns={"gene_a": "gene_b", "gene_b": "gene_a"})
         df_from_to = pd.concat([df_from_to, df_rev])
         df_from_to = df_from_to[~df_from_to.duplicated()]
         df_from_to = df_from_to.rename(columns={"gene_a": "from", "gene_b": "to"})
         df_all = df_distance.merge(df_from_to,how="right",on=["from", "to"])
+        df_all.to_csv(output.gene_distances, sep="\t", index=False)
         endpoints = json.loads([l for l in open(input.interaction_endpoints,"r")][0])
 
         genes_a = list(pd.read_csv(input.term_a).gene)
         genes_b = list(pd.read_csv(input.term_b).gene)
+
         with open(output.term_distance, "w") as w:
             w.write("from_term\tdepth\tprobability\n")
             for i in range(1, config["max_depth"]):

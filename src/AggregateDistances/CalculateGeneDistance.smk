@@ -85,7 +85,7 @@ rule calculate_gene_distance:
                     number_of_hits = endpoints[gene][i][target]
                     return number_of_hits, i , endpoints[gene][i]["possible_paths"]
 
-            return 0, -1
+            return 0, -1, 0
 
         endpoints = json.loads([l for l in open(input.interaction_endpoints, "r")][0])
 

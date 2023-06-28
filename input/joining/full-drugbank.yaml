@@ -1,0 +1,8 @@
+name: "enzyme-target"
+lists:
+  - "enzyme-target"
+  - "HPO-pruned"
+joining:
+    "data/hpo_med.csv"
+
+number_clusters: 3
