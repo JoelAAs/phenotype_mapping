@@ -4,15 +4,15 @@ import pandas as pd
 import sys
 
 
-def get_all_at_depth(input_genes):
+def get_all_at_depth(input_genes, depth):
     with open(input_genes, "r") as f:
         lines = f.readlines()
 
     gene_depth = []
     for l in lines[1:]:
-        gene, depth = l.strip().split("\t")
-        gene_depth.append([gene, int(depth)])
-
+        gene = l.strip()
+        for at_depth in range(1, depth+1):
+            gene_depth.append([gene, at_depth])
     return gene_depth
 
 
@@ -41,7 +41,7 @@ def _format_to_line(gene, gene_dict, output, previous):
 
 
 def get_all_neighbours_at_depth(output_folder, gene_name, depth, graph):
-    print(f"getting enpoints for {gene_name} at depth {depth}")
+    print(f"getting paths for {gene_name} at depth {depth}")
 
     neighbours = _get_neighbours_at_depth(
         gene_name,
@@ -80,8 +80,8 @@ def setup_network(ppi_network_file):
     return graph
 
 
-def parralleled_main(input_genes, ppi_file, output_folder, n_cores=8):
-    gene_and_depth = get_all_at_depth(input_genes)
+def parralleled_main(input_genes, ppi_file, output_folder, n_cores=6, max_depth=6):
+    gene_and_depth = get_all_at_depth(input_genes, max_depth)
     graph = setup_network(ppi_file)
     pool = mp.Pool(n_cores)
     processes = [pool.apply_async(
@@ -103,4 +103,5 @@ if __name__ == '__main__':
     input_genes = args[0]
     ppi_file = args[1]
     output_folder = args[2]
-    parralleled_main(input_genes, ppi_file, output_folder)
+    max_depth = int(args[3])
+    parralleled_main(input_genes, ppi_file, output_folder, max_depth=max_depth)

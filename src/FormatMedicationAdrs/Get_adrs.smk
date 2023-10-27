@@ -1,5 +1,0 @@
-
-
-rule GetMedication:
-    input:
-
