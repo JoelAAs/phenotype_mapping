@@ -99,7 +99,6 @@ def parralleled_main(input_genes, ppi_file, output_folder, n_cores=6, max_depth=
 
 if __name__ == '__main__':
     args = sys.argv[1:]
-    print(args)
     input_genes = args[0]
     ppi_file = args[1]
     output_folder = args[2]
