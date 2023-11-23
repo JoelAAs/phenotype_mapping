@@ -20,15 +20,15 @@ def sc_norm_lapacian(edge_file, output, n_clusters=4):
     )
     node_list = [n for n in G.nodes]
     adj = nx.adjacency_matrix(G, node_list, weight="probability")
-    L = laplacian(adj, normed=True)  # in as default
+    L = laplacian(adj.todense(), normed=True)  # in as default
 
-    eigenvalues, eigenvectors = eigsh(L, k = len(node_list)-1)
+    eigenvalues, eigenvectors = eigsh(L, k=len(node_list) - 1)
     km = KMeans(
         n_clusters=n_clusters).fit(
-        eigenvectors[:, :n_clusters+2]
+        eigenvectors[:, :n_clusters + 2]
     )
 
-    partition_dict = {k:[] for k in range(n_clusters)}
+    partition_dict = {k: [] for k in range(n_clusters)}
     for i, node in enumerate(node_list):
         partition_dict[km.labels_[i]].append(node)
 
@@ -37,4 +37,3 @@ def sc_norm_lapacian(edge_file, output, n_clusters=4):
         for cluster in partition_dict:
             for node in partition_dict[cluster]:
                 w.write(f"{node}\t{cluster}\n")
-

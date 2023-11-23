@@ -9,7 +9,7 @@ def graph_plot(edge_file, cluster_file, project, method, output):
     with open(cluster_file, "r") as f:
         clusters_lines = [line.strip() for line in f.readlines()]
 
-    cluster_dict= {}
+    cluster_dict = {}
     for line in clusters_lines[1:]:
         node, cluster = line.split("\t")
         cluster = int(cluster)
@@ -50,8 +50,7 @@ def graph_plot(edge_file, cluster_file, project, method, output):
     plt.savefig(output, dpi=300)
 
 
-def cluster_graph_plot(edge_file, project, method,  output):
-
+def cluster_graph_plot(edge_file, project, method, output):
     edge_list_df = pd.read_csv(edge_file, sep="\t")
     G = nx.from_pandas_edgelist(
         edge_list_df,
@@ -66,7 +65,6 @@ def cluster_graph_plot(edge_file, project, method,  output):
         G.nodes[node]["shape"] = ('o' if node[0:2] in ["HP", "OR"] else "d")
         G.nodes[node]["size"] = (100 if node[0:2] in ["HP", "OR"] else 150)
         G.nodes[node]["color"] = (sns_cm[0] if node[0:2] in ["HP", "OR"] else sns_cm[1])
-
 
     width = 7.3
     height = 7.3
@@ -92,7 +90,29 @@ def cluster_graph_plot(edge_file, project, method,  output):
         )
 
     nx.draw_networkx_edges(G, pos, edge_color="grey")
-    labels = {node: node for node in G}
     plt.title(f"{method} results of {project}, single cluster")
 
     plt.savefig(output, dpi=300)
+
+
+def plot_silhouette(silhouette_scores, figure_location):
+    silhouette_scores_df = pd.read_csv(silhouette_scores, sep="\t")
+    silhouette_scores_df = silhouette_scores_df.sort_values(by=["cluster", "s"], ascending=False)
+    sns.color_palette("tab10")
+    width = 7.3
+    height = 7.3 * 2
+    fig, axes = plt.subplots(1, 1, figsize=(width, height))
+    ax = sns.barplot(
+        silhouette_scores_df,
+        y="node",
+        x="s",
+        hue="cluster",
+        palette="tab10",
+        legend=None
+    )
+    ax.axvline(x=silhouette_scores_df["s"].mean(),  # Line on x = 2
+               ymin=0,  # Bottom of the plot
+               ymax=1)  # Top of the plot
+    ax.set_xlabel("Silhouette score", fontsize=16)
+    ax.set_ylabel("Node", fontsize=16)
+    plt.savefig(figure_location, dpi=300)
