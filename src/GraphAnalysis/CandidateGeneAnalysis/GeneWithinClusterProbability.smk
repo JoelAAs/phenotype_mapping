@@ -5,20 +5,21 @@ import numpy as np
 import pandas as pd
 
 # Config
-if type(config["projects"]) != list():
-    config["projects"] = [config["projects"], ]
+# if type(config["projects"]) != list():
+#     config["projects"] = [config["projects"], ]
+
 
 for project in config["projects"]:
     terms = glob.glob(f"input/{project}/*.csv")
-    terms = [t.split("\t")[2].replace(".csv", "") for t in terms]
-    config["projects"][project] = terms
+    terms = [t.split("/")[2].replace(".csv", "") for t in terms]
+    config[project] = terms
 
 
 # input functions
 def get_gene_input(projects):
     expected_gene_input = []
     for project in projects:
-        for term in config["projects"][project]:
+        for term in config[project]:
             with open(f"input/{project}/{term}.csv", "r") as f:
                 genes = [g.strip() for g in f][1:]
                 for gene in genes:
@@ -28,7 +29,7 @@ def get_gene_input(projects):
 def get_term_genesets(projects):
     expected_term_genests = []
     for project in projects:
-        for term in config["projects"][project]:
+        for term in config[project]:
             expected_term_genests.append(f"input/{project}/{term}.csv")
     return list(set(expected_term_genests))
 
@@ -37,10 +38,10 @@ def get_cluster_gene_probabilities(wc):
     clusters, = glob_wildcards(os.path.join(cluster_prob_ck, "cluster_{cluster}.csv"))
     return expand(os.path.join(cluster_edge_ck, "cluster_{cluster}.csv"), cluster=clusters)
 
-def get_expected_enrichments(wc:)
+def get_expected_enrichments(wc):
     cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
     clusters, = glob_wildcards(os.path.join(cluster_prob_ck, "cluster_{cluster}.csv"))
-    output_path = f"work/{wc.project}/cadidate_genes/probabilities_{wc.n_clusters}/cluster_{{cluster}}.csv"
+    output_path = f"work/{wc.project}/candidate_genes/enrichment_{wc.n_clusters}/enrichment_{{cluster}}.csv"
     return expand(output_path, cluster = clusters)
 
 checkpoint gene_in_cluster_probability_aggregation:
@@ -49,7 +50,7 @@ checkpoint gene_in_cluster_probability_aggregation:
         term_genesets  = get_term_genesets(config["projects"]),
         cluster_file   = "work/{project}/clustering/SCnorm_{n_clusters}.csv"
     output:
-        directory("work/{project}/cadidate_genes/probabilities_{n_clusters}/")
+        directory("work/{project}/candidate_genes/probabilities_{n_clusters}/")
     run:
         os.mkdir(output[0])
         cluster_dict = {}
@@ -85,7 +86,7 @@ checkpoint gene_in_cluster_probability_aggregation:
                                         probability_dict[gene] = p_gene_path
                 terms += 1
 
-            with open(f"work/{wildcards.project}/cadidate_genes/probabilities_{wildcards.n_clusters}/cluster_{cluster}.csv", "w") as w:
+            with open(f"work/{wildcards.project}/candidate_genes/probabilities_{wildcards.n_clusters}/cluster_{cluster}.csv", "w") as w:
                 w.write("gene\ty_probability\n")
                 for gene in probability_dict:
                     w.write(f"{gene}\t{probability_dict[gene]/terms}\n")
@@ -93,12 +94,13 @@ checkpoint gene_in_cluster_probability_aggregation:
 rule probability_cutof_and_entrez:
     input:
         entrez = "data/ncbi/entrez.csv",
-        cluster_probability= "work/{project}/cadidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv"
+        string_id= "data/stringdb/9606.protein.info.v11.5.txt",
+        cluster_probability= "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv"
     output:
-        translated = "work/{project}/cadidate_genes/enrichment_{n_clusters}/entrez_top_{cluster}.csv"
+        translated = "work/{project}/candidate_genes/enrichment_{n_clusters}/entrez_top_{cluster}.csv"
     run:
         cluster_prob = pd.read_csv(input.cluster_probability, sep = "\t")
-        cluster_prob["logprob"] = np.log10(cluster["y_probability"]) # approx normal dist in logspace
+        cluster_prob["logprob"] = np.log10(cluster_prob["y_probability"]) # approx normal dist in logspace
         mu = cluster_prob["logprob"].mean()
         std = cluster_prob["logprob"].std()
 
@@ -106,24 +108,37 @@ rule probability_cutof_and_entrez:
         top_df = cluster_prob[cluster_prob["logprob"] > threshold]
 
         entrez_df = pd.read_csv(input.entrez, sep="\t")
-        entrez_top = top_df.merge(entrez_df, on = "gene")
+        string_df = pd.read_csv(input.string_id, sep = "\t")
+
+        string_top = top_df.merge(
+            string_df,
+            left_on = "gene",
+            right_on="string_protein_id",
+            how="left")
+
+        entrez_top = string_top.merge(
+            entrez_df,
+            left_on="preferred_name",
+            right_on="gene_name",
+            how="left")
+
         entrez_top["entrez"].to_csv(output.translated, index=False)
 
 rule enrichment_analysis:
     input:
-        cluster_probability = "work/{project}/cadidate_genes/enrichment_{n_clusters}/entrez_top_{cluster}.csv"
+        cluster_probability = "work/{project}/candidate_genes/enrichment_{n_clusters}/entrez_top_{cluster}.csv"
     output:
-        enrichment_results = "work/{project}/cadidate_genes/enrichment_{n_clusters}/enrichment_{cluster}.csv"
+        enrichment_results = "work/{project}/candidate_genes/enrichment_{n_clusters}/enrichment_{cluster}.csv"
     shell:
         """
-        Rscript src/CandidateGeneAnalysis/Enrichment.R {input} {output}
+        Rscript src/GraphAnalysis/CandidateGeneAnalysis/Enrichment.R {input} {output}
         """
 
 rule enrichment_done:
     input:
         get_expected_enrichments
     output:
-        "work/{project}/cadidate_genes/enrichment_{n_clusters}/done.csv"
+        "work/{project}/candidate_genes/enrichment_{n_clusters}/done.csv"
     shell:
         """
         touch {output}
