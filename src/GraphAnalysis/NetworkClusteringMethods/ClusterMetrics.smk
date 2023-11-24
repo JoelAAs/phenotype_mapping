@@ -1,7 +1,7 @@
 from ClusteringMetrics import silhouette
 
 
-rule:
+rule silhouette_analysis:
     input:
         edge_file="work/{project}/term_to_term_probability_matrix.csv",
         cluster_file = "work/{project}/clustering/SCnorm_{n_clusters}.csv"

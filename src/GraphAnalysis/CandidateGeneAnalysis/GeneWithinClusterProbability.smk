@@ -2,27 +2,16 @@ import glob
 import os
 import bz2
 
-project_name = config["project_name"]
-terms = []
-unique_genes = set()
-for input_term in glob.glob(f"input/{project_name}/*csv"):
-    term = os.path.basename(input_term).replace(".csv", "")
-    terms.append(term)
-    with open(input_term, "r") as f:
-        genes = [l.strip() for l in f]
-        config[term] = genes[1:]
-        unique_genes.update(genes[1:])
-
-config["terms"] = terms
 
 checkpoint gene_in_cluster_probability_aggregation:
     input:
         #genes_in_paths = expand("work/{{project}}/neighborhood/{gene}_p_gene.csv.bz2", gene = unique_genes), problematic if its a joined project. hardcode and assume it exists
-        term_genesets  = expand("input/{{project}}/{term}.csv", term = terms),
+        #term_genesets  = expand("input/{{project}}/{term}.csv", term = terms),
         cluster_file   = "work/{project}/clustering/SCnorm_{n_clusters}.csv"
     output:
         directory("work/{project}/cadidate_genes/probabilities_{n_clusters}/")
     run:
+        os.mkdir(output[0])
         cluster_dict = {}
         with open(input.cluster_file,"r") as f:
             lines = f.readlines()
@@ -37,6 +26,7 @@ checkpoint gene_in_cluster_probability_aggregation:
             probability_dict = {}
             terms = 0
             for node in cluster_dict[cluster]:
+                print(f"Node: {node} for cluster {cluster}")
                 project_input = ("HPO-pruned" if node[:3] == "HP-" or node[:5] == "ORPHA" else "full-drugbank")
                 with open(f"input/{project_input}/{node}.csv", "r") as f:
                     genes = [l.strip() for l in f][1:]  # TODO: check if input has header
@@ -48,6 +38,7 @@ checkpoint gene_in_cluster_probability_aggregation:
                                     header = False
                                 else:
                                     gene, p_gene_path = line.decode("utf-8").strip().split()
+                                    p_gene_path = float(p_gene_path)
                                     if gene in probability_dict:
                                         probability_dict[gene] += p_gene_path
                                     else:

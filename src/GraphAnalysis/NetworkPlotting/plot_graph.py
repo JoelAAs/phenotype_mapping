@@ -103,12 +103,11 @@ def plot_silhouette(silhouette_scores, figure_location):
     height = 7.3 * 2
     fig, axes = plt.subplots(1, 1, figsize=(width, height))
     ax = sns.barplot(
-        silhouette_scores_df,
+        data=silhouette_scores_df,
         y="node",
         x="s",
         hue="cluster",
-        palette="tab10",
-        legend=None
+        palette="tab10"
     )
     ax.axvline(x=silhouette_scores_df["s"].mean(),  # Line on x = 2
                ymin=0,  # Bottom of the plot
