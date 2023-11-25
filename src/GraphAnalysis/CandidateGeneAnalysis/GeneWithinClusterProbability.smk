@@ -41,7 +41,7 @@ def get_cluster_gene_probabilities(wc):
 def get_expected_enrichments(wc):
     cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
     clusters, = glob_wildcards(os.path.join(cluster_prob_ck, "cluster_{cluster}.csv"))
-    output_path = f"work/{wc.project}/candidate_genes/enrichment_{wc.n_clusters}/enrichment_{{cluster}}.csv"
+    output_path = f"work/{wc.project}/clustering/plots/enrichment_{wc.n_clusters}/{wc.method}/enrichment_{{cluster}}.png"
     return expand(output_path, cluster = clusters)
 
 checkpoint gene_in_cluster_probability_aggregation:
@@ -97,7 +97,7 @@ rule probability_cutof_and_entrez:
         string_id= "data/stringdb/9606.protein.info.v11.5.txt",
         cluster_probability= "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv"
     output:
-        translated = "work/{project}/candidate_genes/enrichment_{n_clusters}/entrez_top_{cluster}.csv"
+        translated = "work/{project}/candidate_genes/enrichment_{n_clusters}/top/entrez_top_{cluster}.csv"
     run:
         cluster_prob = pd.read_csv(input.cluster_probability, sep = "\t")
         cluster_prob["logprob"] = np.log10(cluster_prob["y_probability"]) # approx normal dist in logspace
@@ -124,11 +124,28 @@ rule probability_cutof_and_entrez:
 
         entrez_top["entrez"].to_csv(output.translated, index=False)
 
+
+rule Diamond:
+    params:
+        ppi_cutoff=0.7,
+    input:
+        cluster_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/top/entrez_top_{cluster}.csv",
+        ppi_cluster = "data/9606.protein.links.v11.5.txt",
+    output:
+        inferred_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/entrez_top_{cluster}.csv"
+    singularity:
+        "envs/modifier.simg"
+    shell:
+        """
+        Rscript src/GraphAnalysis/CandidateGeneAnalysis/Diamond.R {input.cluster_genes} {output.inferred_genes} \
+            {input.ppi_cluster} {params.ppi_cutoff}
+        """
+
 rule enrichment_analysis:
     input:
-        cluster_probability = "work/{project}/candidate_genes/enrichment_{n_clusters}/entrez_top_{cluster}.csv"
+        cluster_probability = "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/entrez_top_{cluster}.csv"
     output:
-        enrichment_results = "work/{project}/candidate_genes/enrichment_{n_clusters}/enrichment_{cluster}.csv"
+        enrichment_results = "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/enrichment_{cluster}.csv"
     shell:
         """
         Rscript src/GraphAnalysis/CandidateGeneAnalysis/Enrichment.R {input} {output}
@@ -138,7 +155,7 @@ rule enrichment_done:
     input:
         get_expected_enrichments
     output:
-        "work/{project}/candidate_genes/enrichment_{n_clusters}/done.csv"
+        "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/done.csv"
     shell:
         """
         touch {output}

@@ -1,3 +1,6 @@
+library(clusterProfiler)
+
+
 args <- commandArgs(trailingOnly=TRUE)
 genes_entrez_file <- args[1]
 output_file <- args[2]
@@ -12,4 +15,4 @@ pathEnrich <- enrichKEGG(
     pvalueCutoff = 0.05,
     pAdjustMethod = "BH")
 
-write.csv(pathEnrich@result, output_file, sep="\t")
+write.table(pathEnrich@result, output_file, sep="\t")

@@ -1,7 +1,8 @@
 include: "NetworkClusteringMethods/Clusters.smk"
-include: "NetworkPlotting/PlotGraphs.smk"
 include: "NetworkClusteringMethods/ClusterMetrics.smk"
 include: "CandidateGeneAnalysis/GeneWithinClusterProbability.smk"
+include: "NetworkPlotting/PlotGraphs.smk"
+
 projects = [
     "HPO-pruned",
     "full-drugbank",
@@ -24,7 +25,9 @@ rule all:
             project=projects, n_clusters=n_clusters),
         expand("work/{project}/clustering/plots/silouette_{n_clusters}.png",
             project=projects, n_clusters=n_clusters),
-        "work/MedAdr/cadidate_genes/probabilities_4/",
-        "work/MedAdr/cadidate_genes/probabilities_3/",
-        "work/HPO-pruned/cadidate_genes/probabilities_4/",
-        "work/full-drugbank/cadidate_genes/probabilities_3/"
+        "work/MedAdr/candidate_genes/probabilities_4/",
+        "work/MedAdr/candidate_genes/probabilities_3/",
+        "work/HPO-pruned/candidate_genes/probabilities_4/",
+        "work/full-drugbank/candidate_genes/probabilities_3/",
+        "work/MedAdr/candidate_genes/enrichment_4/top/done.csv",
+        "work/MedAdr/candidate_genes/enrichment_4/diamond/done.csv"

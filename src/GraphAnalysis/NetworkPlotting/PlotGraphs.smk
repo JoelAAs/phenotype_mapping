@@ -8,6 +8,7 @@ def get_clusteredge_output(wc):
     clusters, = glob_wildcards(os.path.join(cluster_edge_ck, "SC_edges_{cluster}.csv"))
     return expand(os.path.join(cluster_edge_ck, "SC_edges_{cluster}.csv"), cluster=clusters)
 
+
 rule SCPlot:
     input:
         graph = "work/{project}/term_to_term_probability_matrix.csv",
@@ -80,3 +81,13 @@ rule SilhouettePlot:
             input.silhouette_file,
             output.figure_location
         )
+
+rule PlotEnrichment:
+    input:
+        enrichments = "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/enrichment_{cluster}.csv"
+    output:
+        figure = "work/{project}/clustering/plots/enrichment_{n_clusters}/{method}/enrichment_{cluster}.png"
+    shell:
+        """
+        Rscript src/GraphAnalysis/NetworkPlotting/Enrichmentplot.R {input} {output}
+        """
