@@ -27,7 +27,5 @@ rule all:
             project=projects, n_clusters=n_clusters),
         "work/MedAdr/candidate_genes/probabilities_4/",
         "work/MedAdr/candidate_genes/probabilities_3/",
-        "work/HPO-pruned/candidate_genes/probabilities_4/",
-        "work/full-drugbank/candidate_genes/probabilities_3/",
         "work/MedAdr/candidate_genes/enrichment_4/top/done.csv",
         "work/MedAdr/candidate_genes/enrichment_4/diamond/done.csv"

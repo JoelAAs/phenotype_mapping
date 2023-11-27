@@ -3,9 +3,10 @@ import networkx as nx
 from matplotlib.pylab import cm
 import matplotlib.pyplot as plt
 import seaborn as sns
+import numpy as np
 
 
-def graph_plot(edge_file, cluster_file, project, method, output):
+def graph_plot(edge_file, cluster_file, project, method, output, keep_edges=0.5):
     with open(cluster_file, "r") as f:
         clusters_lines = [line.strip() for line in f.readlines()]
 
@@ -19,6 +20,11 @@ def graph_plot(edge_file, cluster_file, project, method, output):
             cluster_dict[cluster] = [node]
 
     edge_list_df = pd.read_csv(edge_file, sep="\t")
+    weights = [w for w in edge_list_df["probability"] if w != 1]  # remove connections
+    weights = sorted(weights)
+    max_value = weights[int((1 - keep_edges) * len(weights))]
+    edge_list_df = edge_list_df[edge_list_df["probability"] > max_value]
+
     G = nx.from_pandas_edgelist(
         edge_list_df,
         "query",
@@ -34,17 +40,29 @@ def graph_plot(edge_file, cluster_file, project, method, output):
     height = 7.3
     fig, axes = plt.subplots(1, 1, figsize=(width, height))
 
+    node_shapes = ["o", "d"]
+    for node in G:
+        G.nodes[node]["shape"] = ('o' if node[0:2] in ["HP", "OR"] else "d")
+
     pos = nx.spring_layout(G, weight="probability")
-    for cluster in cluster_dict:
-        nx.draw_networkx_nodes(
-            G,
-            pos,
-            nodelist=cluster_dict[cluster],
-            node_color=cluster_colors[cluster]
-        )
-    nx.draw_networkx_edges(G, pos, edge_color="grey")
-    labels = {node: node for node in G}
+    for shape in set(node_shapes):
+        # the nodes with the desired shapes
+        node_list_shape = [node for node in G.nodes() if G.nodes[node]['shape'] == shape]
+
+        for cluster in cluster_dict:
+            node_list = [node for node in node_list_shape if node in cluster_dict[cluster]]
+            nx.draw_networkx_nodes(
+                G,
+                pos,
+                nodelist=node_list,
+                node_color=cluster_colors[cluster],
+                node_shape=shape
+            )
+
+    labels = {node: node for node in G if G.nodes[node]["shape"] == "d"}
     nx.draw_networkx_labels(G, pos, labels, font_color="black")
+
+    nx.draw_networkx_edges(G, pos, edge_color="grey")
     plt.title(f"{method} results of {project}")
 
     plt.savefig(output, dpi=300)
