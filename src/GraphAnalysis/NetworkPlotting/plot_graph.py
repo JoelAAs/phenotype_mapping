@@ -6,7 +6,7 @@ import seaborn as sns
 import numpy as np
 
 
-def graph_plot(edge_file, cluster_file, project, method, output, keep_edges=0.5):
+def graph_plot(edge_file, cluster_file, project, method, output, keep_edges=0.8):
     with open(cluster_file, "r") as f:
         clusters_lines = [line.strip() for line in f.readlines()]
 

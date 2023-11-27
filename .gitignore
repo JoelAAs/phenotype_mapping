@@ -2,4 +2,4 @@ work/*
 .Rhistory
 .idea/*
 .snakemake/*
-*__pychache__*
+*/__pychache__/*

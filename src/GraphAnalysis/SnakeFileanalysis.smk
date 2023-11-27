@@ -24,8 +24,8 @@ rule all:
         expand("work/{project}/clustering/plots/single_clusters_{n_clusters}/done.txt",
             project=projects, n_clusters=n_clusters),
         expand("work/{project}/clustering/plots/silouette_{n_clusters}.png",
-            project=projects, n_clusters=n_clusters),
-        "work/MedAdr/candidate_genes/probabilities_4/",
-        "work/MedAdr/candidate_genes/probabilities_3/",
-        "work/MedAdr/candidate_genes/enrichment_4/top/done.csv",
-        "work/MedAdr/candidate_genes/enrichment_4/diamond/done.csv"
+            project=projects, n_clusters=n_clusters)
+        #"work/MedAdr/candidate_genes/probabilities_4/",
+        #"work/MedAdr/candidate_genes/probabilities_3/",
+        #"work/MedAdr/candidate_genes/enrichment_4/top/done.csv",
+        #"work/MedAdr/candidate_genes/enrichment_4/diamond/done.csv"
