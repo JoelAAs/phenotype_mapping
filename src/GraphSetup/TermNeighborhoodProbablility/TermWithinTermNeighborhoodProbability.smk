@@ -25,7 +25,7 @@ rule aggregate_Term_probabilities:
             neighborhood_set = name_str[-1].replace(".csv", "")
             term_pair_df = pd.read_csv(term_pair_file, sep = "\t")
             term_pair_df = term_pair_df.drop('gene', axis=1)
-            prob_term2term = term_pair_df.sum(axis=0).mean()
+            prob_term2term = term_pair_df.mean(axis=0).mean()
             output_rows.append({
                 "query": query_set,
                 "neighborhood": neighborhood_set,
