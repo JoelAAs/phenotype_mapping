@@ -82,6 +82,18 @@ rule SilhouettePlot:
             output.figure_location
         )
 
+rule ScatterPlot:
+    input:
+        probability_annotatied_csv = "work/{project}/candidate_genes/annotated_{n_clusters}/annotated_{cluster}.csv"
+    output:
+        figure = "work/{project}/candidate_genes/plots/annotated_{n_clusters}/annotated_{cluster}.png"
+    shell:
+        """
+        Rscript src/GraphAnalysis/NetworkPlotting/PlotClusterGeneProbability.R {input} {output}
+        """
+
+
+
 rule PlotEnrichment:
     input:
         enrichments = "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/enrichment_{cluster}.csv"
@@ -91,3 +103,4 @@ rule PlotEnrichment:
         """
         Rscript src/GraphAnalysis/NetworkPlotting/Enrichmentplot.R {input} {output}
         """
+

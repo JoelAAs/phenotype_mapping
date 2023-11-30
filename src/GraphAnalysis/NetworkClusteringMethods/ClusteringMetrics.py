@@ -41,7 +41,7 @@ def silhouette(edge_file, cluster_file, silhouette_output):
         cluster_idx = [node in cluster_dict[cluster] for node in node_list]
         cluster_dict[cluster] = cluster_idx
 
-    n_eigen = len(cluster_dict) + 2
+    n_eigen = len(cluster_dict)
     if n_eigen > eigenvectors.shape[1]:
         n_eigen = eigenvectors.shape[1]
 

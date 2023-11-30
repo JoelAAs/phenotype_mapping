@@ -4,10 +4,9 @@ import bz2
 import numpy as np
 import pandas as pd
 from DIAMOnD import *
-# Config
-# if type(config["projects"]) != list():
-#     config["projects"] = [config["projects"], ]
+from ClusterGeneProbabilities import get_centrality_of_cluster_genes, get_occurrence_of_genes_in_terms
 
+# Config
 
 for project in config["projects"]:
     terms = glob.glob(f"input/{project}/*.csv")
@@ -44,6 +43,13 @@ def get_expected_enrichments(wc):
     output_path = f"work/{wc.project}/clustering/plots/enrichment_{wc.n_clusters}/{wc.method}/enrichment_{{cluster}}.png"
     return expand(output_path, cluster = clusters)
 
+def get_expected_centrality(wc):
+    cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
+    clusters, = glob_wildcards(os.path.join(cluster_prob_ck,"cluster_{cluster}.csv"))
+    output_path = f"work/{wc.project}/candidate_genes/plots/annotated_{wc.n_clusters}/annotated_{{cluster}}.png"
+    return expand(output_path,cluster=clusters)
+
+
 checkpoint gene_in_cluster_probability_aggregation:
     input:
         genes_in_paths = get_gene_input(config["projects"]),
@@ -68,7 +74,7 @@ checkpoint gene_in_cluster_probability_aggregation:
             terms = 0
             for node in cluster_dict[cluster]:
                 print(f"Node: {node} for cluster {cluster}")
-                project_input = ("HPO-pruned" if node[:3] == "HP-" or node[:5] == "ORPHA" else "full-drugbank")
+                project_input = ("HPO-pruned" if node[:3] == "HP-" or node[:5] == "ORPHA" else "full-drugbank") # TODO: HARDCODED MUST BE CHANGED
                 with open(f"input/{project_input}/{node}.csv", "r") as f:
                     genes = [l.strip() for l in f][1:]
                     for gene in genes:
@@ -91,7 +97,7 @@ checkpoint gene_in_cluster_probability_aggregation:
                 for gene in probability_dict:
                     w.write(f"{gene}\t{probability_dict[gene]/terms}\n")
 
-rule probability_cutof_and_entrez:
+rule probability_cutoff_and_entrez:
     input:
         entrez = "data/ncbi/entrez.csv",
         string_id= "data/stringdb/9606.protein.info.v11.5.txt",
@@ -104,7 +110,7 @@ rule probability_cutof_and_entrez:
         mu = cluster_prob["logprob"].mean()
         std = cluster_prob["logprob"].std()
 
-        threshold = mu + std*1.65 # ~ 95%
+        threshold = mu + std*2 # ~ 95%
         top_df = cluster_prob[cluster_prob["logprob"] > threshold]
 
         entrez_df = pd.read_csv(input.entrez, sep="\t")
@@ -213,6 +219,45 @@ rule enrichment_done:
         get_expected_enrichments
     output:
         "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/done.csv"
+    shell:
+        """
+        touch {output}
+        """
+
+rule get_centrality_and_frequence:
+    input:
+        probabilities_df = "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv",
+        cluster_file = "work/{project}/clustering/SCnorm_{n_clusters}.csv",
+        ppi_file = "data/9606.protein.links.v11.5.txt",
+    output:
+        probability_annotatied_csv = "work/{project}/candidate_genes/annotated_{n_clusters}/annotated_{cluster}.csv"
+    run:
+        term_frequence_df, n_terms = get_occurrence_of_genes_in_terms(
+            input.cluster_file,
+            wildcards.cluster,
+            config["projects"]
+        )
+        centrality_df = get_centrality_of_cluster_genes(
+            input.ppi_file,
+            input.probabilities_df
+        )
+        centrality_df["n_terms"] = n_terms
+
+        annotated_df = centrality_df.merge(
+            term_frequence_df,
+            on="gene",
+            how="left"
+        )
+        annotated_df = annotated_df.fillna(value=0)
+        annotated_df.to_csv(
+            output.probability_annotatied_csv, sep="\t", index=False
+        )
+
+rule get_centrality_and_frequnece_done:
+    input:
+        get_expected_centrality
+    output:
+        "work/{project}/candidate_genes/annotated_{n_clusters}/done.txt"
     shell:
         """
         touch {output}
