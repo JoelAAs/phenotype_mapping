@@ -14,7 +14,7 @@ rule SCPlot:
         graph = "work/{project}/term_to_term_probability_matrix.csv",
         clusters = "work/{project}/clustering/SCnorm_{n_cluster}.csv"
     output:
-        figure = "work/{project}/clustering/plots/SC_{n_cluster}.png"
+        figure = "work/{project}/plots/clustering/SC_{n_cluster}.png"
     run:
         graph_plot(
             input.graph,
@@ -58,7 +58,7 @@ rule ClusterPlot:
     input:
         get_clusteredge_output
     output:
-        check = "work/{project}/clustering/plots/single_clusters_{n_clusters}/done.txt"
+        check = "work/{project}/plots/clustering/single_clusters_{n_clusters}/done.txt"
     run:
         with open(output.check, "w") as w:
             w.write("check")
@@ -68,14 +68,14 @@ rule ClusterPlot:
                 cluster_edge_file,
                 wildcards.project,
                 "Spectral clustering",
-                f"work/{wildcards.project}/clustering/plots/single_clusters_{wildcards.n_clusters}/cluster_{i}.png"
+                f"work/{wildcards.project}/plots/clustering/single_clusters_{wildcards.n_clusters}/cluster_{i}.png"
             )
 
 rule SilhouettePlot:
     input:
         silhouette_file = "work/{project}/clustering/metrics/silouette_{n_clusters}.csv"
     output:
-        figure_location = "work/{project}/clustering/plots/silouette_{n_clusters}.png"
+        figure_location = "work/{project}/plots/clustering/silhouette/silouette_{n_clusters}.png"
     run:
         plot_silhouette(
             input.silhouette_file,
@@ -86,7 +86,7 @@ rule ScatterPlot:
     input:
         probability_annotatied_csv = "work/{project}/candidate_genes/annotated_{n_clusters}/annotated_{cluster}.csv"
     output:
-        figure = "work/{project}/candidate_genes/plots/annotated_{n_clusters}/annotated_{cluster}.png"
+        figure = "work/{project}/plots/candidate_genes/annotated/annotated_{n_clusters}/annotated_{cluster}.png"
     shell:
         """
         Rscript src/GraphAnalysis/NetworkPlotting/PlotClusterGeneProbability.R {input} {output}
@@ -98,7 +98,7 @@ rule PlotEnrichment:
     input:
         enrichments = "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/enrichment_{cluster}.csv"
     output:
-        figure = "work/{project}/clustering/plots/enrichment_{n_clusters}/{method}/enrichment_{cluster}.png"
+        figure = "work/{project}/plots/candidate_genes/enrichment/enrichment_{n_clusters}/{method}/enrichment_{cluster}.png"
     shell:
         """
         Rscript src/GraphAnalysis/NetworkPlotting/Enrichmentplot.R {input} {output}

@@ -21,7 +21,6 @@ cluster_enrichment$sig <- sapply(cluster_enrichment$qvalue, function(x) x < 0.05
 
 g <- ggplot(cluster_enrichment, aes(x=BG, y=-log10(qvalue), color=sig)) +
   scale_color_manual(values=c("#c3d3ef", "#276FBF")) +
-  ggtitle("KEGG enrichment of clusters assigned by spectral clustering") +
   theme_bw() +
   geom_point() +
   geom_hline(

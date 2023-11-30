@@ -40,13 +40,13 @@ def get_cluster_gene_probabilities(wc):
 def get_expected_enrichments(wc):
     cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
     clusters, = glob_wildcards(os.path.join(cluster_prob_ck, "cluster_{cluster}.csv"))
-    output_path = f"work/{wc.project}/clustering/plots/enrichment_{wc.n_clusters}/{wc.method}/enrichment_{{cluster}}.png"
+    output_path = f"work/{wc.project}/plots/candidate_genes/enrichment/enrichment_{wc.n_clusters}/{wc.method}/enrichment_{{cluster}}.png"
     return expand(output_path, cluster = clusters)
 
 def get_expected_centrality(wc):
     cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
     clusters, = glob_wildcards(os.path.join(cluster_prob_ck,"cluster_{cluster}.csv"))
-    output_path = f"work/{wc.project}/candidate_genes/plots/annotated_{wc.n_clusters}/annotated_{{cluster}}.png"
+    output_path = f"work/{wc.project}/plots/candidate_genes/annotated/annotated_{wc.n_clusters}/annotated_{{cluster}}.png"
     return expand(output_path,cluster=clusters)
 
 
@@ -98,20 +98,26 @@ checkpoint gene_in_cluster_probability_aggregation:
                     w.write(f"{gene}\t{probability_dict[gene]/terms}\n")
 
 rule probability_cutoff_and_entrez:
+    params:
+        centrality_max = 0.3
     input:
         entrez = "data/ncbi/entrez.csv",
         string_id= "data/stringdb/9606.protein.info.v11.5.txt",
-        cluster_probability= "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv"
+        cluster_probability= "work/{project}/candidate_genes/annotated_{n_clusters}/annotated_{cluster}.csv"
     output:
         translated = "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_{cluster}.csv"
     run:
         cluster_prob = pd.read_csv(input.cluster_probability, sep = "\t")
+        cluster_prob["centrality_norm"] = cluster_prob["centrality"]/cluster_prob["centrality"].max()
+
+
         cluster_prob["logprob"] = np.log10(cluster_prob["y_probability"]) # approx normal dist in logspace
         mu = cluster_prob["logprob"].mean()
         std = cluster_prob["logprob"].std()
 
         threshold = mu + std*2 # ~ 95%
         top_df = cluster_prob[cluster_prob["logprob"] > threshold]
+        cluster_prob = cluster_prob[cluster_prob["centrality_norm"] < params.centrality_max]
 
         entrez_df = pd.read_csv(input.entrez, sep="\t")
         string_df = pd.read_csv(input.string_id, sep = "\t")
@@ -131,18 +137,25 @@ rule probability_cutoff_and_entrez:
         entrez_top["entrez"].to_csv(output.translated, sep="\t", index=False)
 
 rule get_stringid:
+    params:
+        centrality_max = 0.3
     input:
         cluster_genes = "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv"
     output:
         top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv"
     run:
         cluster_prob = pd.read_csv(input.cluster_genes, sep="\t")
+
+        cluster_prob["centrality_norm"] = cluster_prob["centrality"]/cluster_prob["centrality"].max()
+
+
         cluster_prob["logprob"] = np.log10(cluster_prob["y_probability"])  # approx normal dist in logspace
         mu = cluster_prob["logprob"].mean()
         std = cluster_prob["logprob"].std()
 
         threshold = mu + std * 2
         top_df = cluster_prob[cluster_prob["logprob"] > threshold]
+        cluster_prob = cluster_prob[cluster_prob["centrality_norm"] < params.centrality_max]
         top_df.to_csv(output.top, index=False, sep = "\t")
 
 
@@ -168,7 +181,7 @@ rule Diamond:
             outfile=outfile_name)
 
 
-rule translate:
+rule translate_diamond:
     input:
         diamond_top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/enriched/top_stringid_{cluster}.csv",
         seed_tops = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv",
@@ -218,7 +231,7 @@ rule enrichment_done:
     input:
         get_expected_enrichments
     output:
-        "work/{project}/candidate_genes/enrichment_{n_clusters}/{method}/done.csv"
+        "work/{project}/plots/candidate_genes/enrichment/enrichment_{n_clusters}/{method}/done.csv"
     shell:
         """
         touch {output}
@@ -257,7 +270,7 @@ rule get_centrality_and_frequnece_done:
     input:
         get_expected_centrality
     output:
-        "work/{project}/candidate_genes/annotated_{n_clusters}/done.txt"
+        "work/{project}/plots/candidate_genes/annotated/annotated_{n_clusters}/done.txt"
     shell:
         """
         touch {output}
