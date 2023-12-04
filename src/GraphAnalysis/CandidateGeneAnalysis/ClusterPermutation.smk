@@ -1,8 +1,8 @@
 from PermutationAnalysis import sc_norm_permutate, calculate_correct_node_ratio
 
 
-# TODO: Sort out all that exists within cluster
 # TODO: Make hpo node scoring based on connected nodes
+
 rule node_permutation_robustness:
     params:
         n_clusters = 3,
@@ -24,7 +24,7 @@ rule node_permutation_robustness:
             permutation_results=permutation_results_df,
             node_grouping_file=input.node_positions
         )
-        sensitivity_series = node_vote_group_df.mean(skipna=True, axis=1)
+        sensitivity_series = node_vote_group_df.mean(skipna=True, axis=0)
 
         with open(output.clustering_ratio, "w") as w:
             w.write("Node\tSensitivity\n")

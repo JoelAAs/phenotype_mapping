@@ -140,7 +140,7 @@ rule get_stringid:
     params:
         centrality_max = 0.3
     input:
-        cluster_genes = "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv"
+        cluster_genes = "work/{project}/candidate_genes/annotated_{n_clusters}/annotated_{cluster}.csv"
     output:
         top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv"
     run:

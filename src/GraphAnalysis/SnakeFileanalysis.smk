@@ -2,9 +2,10 @@ include: "NetworkClusteringMethods/Clusters.smk"
 include: "NetworkClusteringMethods/ClusterMetrics.smk"
 include: "CandidateGeneAnalysis/GeneWithinClusterProbability.smk"
 include: "NetworkPlotting/PlotGraphs.smk"
+include: "CandidateGeneAnalysis/ClusterPermutation.smk"
 
 projects = [
-#    "HPO-pruned",
+    #"HPO-pruned",
     "full-drugbank",
     "MedAdr"
 ]
@@ -30,4 +31,6 @@ rule all:
         expand("work/{project}/plots/candidate_genes/enrichment/enrichment_{n}/{m}/done.csv",
             project=projects, n=[3,4], m=["top", "diamond"]),
         expand("work/{project}/plots/candidate_genes/annotated/annotated_3/done.txt",
+            project=projects),
+        expand("work/{project}/clustering/metrics/sensitivity.csv",
             project=projects)

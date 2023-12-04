@@ -21,6 +21,8 @@ def sc_norm_permutate(edge_file, n_clusters=4, n_permut=1000, fraction_forgotten
     )
 
     for i in range(n_permut):
+        if i % 50 == 0:
+            print(f"{i}/{n_permut} done")
         sample_df = edge_list_df.sample(frac=1 - fraction_forgotten)
 
         G = nx.from_pandas_edgelist(
@@ -50,28 +52,31 @@ def sc_norm_permutate(edge_file, n_clusters=4, n_permut=1000, fraction_forgotten
 
 
 def calculate_correct_node_ratio(permutation_results, node_grouping_file):
-    group_dict = {}
-    size_dict = {}
+    group_dict = dict()
+    size_dict = dict()
     with open(node_grouping_file, "r") as f:
         lines = [l.strip() for l in f]
         for line in lines[1:]:
             node, group = line.split("\t")
             group_dict[node] = group
-            if group in size_dict:
+            if group not in size_dict:
                 size_dict[group] = 1
             else:
                 size_dict[group] += 1
 
+    column_to_keep = list(group_dict.keys())
+    permutation_results = permutation_results[column_to_keep]
     correct_votes = pd.DataFrame(
         np.full(permutation_results.shape, np.nan),
         columns=permutation_results.columns.values
     )
 
-    row_cluster = {}
-    row_voting = {}
+
     for i, row in permutation_results.iterrows():
+        row_cluster = dict()
+        row_voting = dict()
         for node, cluster in row.items():
-            if cluster in row_voting:
+            if cluster not in row_voting:
                 row_voting[cluster] = [group_dict[node]]
             else:
                 row_voting[cluster].append(group_dict[node])
@@ -89,6 +94,7 @@ def calculate_correct_node_ratio(permutation_results, node_grouping_file):
 
         for node, cluster in row.items():
             if cluster is not np.nan:
-                correct_votes.at[i, node] = row_cluster[cluster] == group_dict[node]
+                correct_votes.at[i, node] = int(row_cluster[cluster] == group_dict[node])
+
 
     return correct_votes
