@@ -8,7 +8,7 @@ import random
 from collections import Counter
 
 
-def sc_norm_permutate(edge_file, n_clusters=4, n_permut=1000, fraction_forgotten=.1):
+def sc_norm_permutate(edge_file, n_clusters=3, n_permut=1000, fraction_forgotten=.1):
     edge_list_df = pd.read_csv(edge_file, sep="\t")
     nodes = list(set(
         edge_list_df["query"].tolist() +
@@ -71,7 +71,6 @@ def calculate_correct_node_ratio(permutation_results, node_grouping_file):
         columns=permutation_results.columns.values
     )
 
-
     for i, row in permutation_results.iterrows():
         row_cluster = dict()
         row_voting = dict()
@@ -98,3 +97,26 @@ def calculate_correct_node_ratio(permutation_results, node_grouping_file):
 
 
     return correct_votes
+
+
+def score_hpo_terms(permutation_csv, node_positions, drug_adr_csv):
+    permutation_df = pd.read_csv(permutation_csv, sep="\t").T
+    node_positions_df = pd.read_csv(node_positions, sep="\t")
+    drug_adr_df = pd.read_csv(drug_adr_csv, sep="\t")
+    drug_adr_df = drug_adr_df[~drug_adr_df["from"].isin(node_positions_df["Node"])]
+    adrs = set(drug_adr_df["from"])
+
+    percent_hits = pd.DataFrame(
+        np.full((permutation_df.shape[1], len(adrs)), np.nan),
+        columns=adrs
+    )
+
+    for j in range(permutation_df.shape[1]):
+        for adr_node in adrs:
+            med_connect_adr = drug_adr_df[drug_adr_df["from"] == adr_node]["to"]
+            chosen_cluster = permutation_df.loc[adr_node][j]
+            terms_in_cluster = permutation_df[permutation_df[j] == chosen_cluster][j].index.tolist()
+            percent_associated = sum([True for m in med_connect_adr if m in terms_in_cluster])/len(med_connect_adr)
+            percent_hits.at[j, adr_node] = percent_associated
+
+    return percent_hits.mean()

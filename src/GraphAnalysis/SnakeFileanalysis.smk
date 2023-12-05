@@ -32,5 +32,4 @@ rule all:
             project=projects, n=[3,4], m=["top", "diamond"]),
         expand("work/{project}/plots/candidate_genes/annotated/annotated_3/done.txt",
             project=projects),
-        expand("work/{project}/clustering/metrics/sensitivity.csv",
-            project=projects)
+        "work/meta_plots/Sensitivity.png"
