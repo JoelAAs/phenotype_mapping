@@ -71,10 +71,13 @@ checkpoint gene_in_cluster_probability_aggregation:
 
         for cluster in cluster_dict:
             probability_dict = {}
-            terms = 0
             for node in cluster_dict[cluster]:
                 print(f"Node: {node} for cluster {cluster}")
-                project_input = ("HPO-pruned" if node[:3] == "HP-" or node[:5] == "ORPHA" else "full-drugbank") # TODO: HARDCODED MUST BE CHANGED
+                for project in config["projects"]:
+                    if os.path.exists(f"input/{project}/{node}.csv"):
+                        project_input = project
+                        break
+
                 with open(f"input/{project_input}/{node}.csv", "r") as f:
                     genes = [l.strip() for l in f][1:]
                     for gene in genes:
@@ -85,21 +88,21 @@ checkpoint gene_in_cluster_probability_aggregation:
                                     header = False
                                 else:
                                     gene, p_gene_path = line.decode("utf-8").strip().split()
-                                    p_gene_path = float(p_gene_path)
+                                    p_gene_path = float(p_gene_path)/len(genes)
                                     if gene in probability_dict:
                                         probability_dict[gene] += p_gene_path
                                     else:
                                         probability_dict[gene] = p_gene_path
-                terms += 1
 
             with open(f"work/{wildcards.project}/candidate_genes/probabilities_{wildcards.n_clusters}/cluster_{cluster}.csv", "w") as w:
                 w.write("gene\ty_probability\n")
                 for gene in probability_dict:
-                    w.write(f"{gene}\t{probability_dict[gene]/terms}\n")
+                    w.write(f"{gene}\t{probability_dict[gene]/len(cluster_dict[cluster])}\n")
 
 rule probability_cutoff_and_entrez:
     params:
-        centrality_max = 0.3
+        centrality_max = 0.3,
+        exclude_starting_terms = True
     input:
         entrez = "data/ncbi/entrez.csv",
         string_id= "data/stringdb/9606.protein.info.v11.5.txt",
@@ -115,9 +118,12 @@ rule probability_cutoff_and_entrez:
         mu = cluster_prob["logprob"].mean()
         std = cluster_prob["logprob"].std()
 
-        threshold = mu + std*2 # ~ 95%
+        threshold = mu + std*2
         top_df = cluster_prob[cluster_prob["logprob"] > threshold]
         cluster_prob = cluster_prob[cluster_prob["centrality_norm"] < params.centrality_max]
+
+        if params.exclude_starting_terms:
+            cluster_prob = cluster_prob[cluster_prob["count"] == 0]
 
         entrez_df = pd.read_csv(input.entrez, sep="\t")
         string_df = pd.read_csv(input.string_id, sep = "\t")
