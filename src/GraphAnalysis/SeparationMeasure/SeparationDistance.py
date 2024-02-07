@@ -121,7 +121,6 @@ class CalculateSeparation:
             w = open(output_file, "a")
         else:
             w = open(output_file, "w")
-            w.write("from\tto\tdsum\tdN\tsab\tu\ts\tz\n")
 
         dab_sum, dab_N, uab, sab, zab = self.calculate_z_scores(genes_a, genes_b)
         dba_sum, dba_N, uba, sba, zba = self.calculate_z_scores(genes_b, genes_a)
