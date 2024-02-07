@@ -108,7 +108,8 @@ rule probability_cutoff_and_entrez:
         string_id= "data/stringdb/9606.protein.info.v11.5.txt",
         cluster_probability= "work/{project}/candidate_genes/annotated_{n_clusters}/annotated_{cluster}.csv"
     output:
-        translated = "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_{cluster}.csv"
+        translated = "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_{cluster}.csv",
+        translated_preffered = "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_gene_name{cluster}.csv",
     run:
         cluster_prob = pd.read_csv(input.cluster_probability, sep = "\t")
         cluster_prob["centrality_norm"] = cluster_prob["centrality"]/cluster_prob["centrality"].max()
@@ -119,7 +120,7 @@ rule probability_cutoff_and_entrez:
         std = cluster_prob["logprob"].std()
 
         threshold = mu + std*2
-        top_df = cluster_prob[cluster_prob["logprob"] > threshold]
+        cluster_prob = cluster_prob[cluster_prob["logprob"] > threshold]
         cluster_prob = cluster_prob[cluster_prob["centrality_norm"] < params.centrality_max]
 
         if params.exclude_starting_terms:
@@ -128,7 +129,7 @@ rule probability_cutoff_and_entrez:
         entrez_df = pd.read_csv(input.entrez, sep="\t")
         string_df = pd.read_csv(input.string_id, sep = "\t")
 
-        string_top = top_df.merge(
+        string_top = cluster_prob.merge(
             string_df,
             left_on = "gene",
             right_on="string_protein_id",
@@ -140,6 +141,7 @@ rule probability_cutoff_and_entrez:
             right_on="gene_name",
             how="left")
 
+        entrez_top[["gene_name", "string_protein_id", "entrez"]].to_csv(output.translated_preffered, sep = "\t", index=False)
         entrez_top["entrez"].to_csv(output.translated, sep="\t", index=False)
 
 rule get_stringid:

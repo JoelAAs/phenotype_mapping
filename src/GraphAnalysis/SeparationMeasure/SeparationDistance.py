@@ -53,10 +53,11 @@ class CalculateSeparation:
                     # print(e)
         distances = distances.min(axis=1)
         if sum(distances == np.inf) == len(distances):
-            dc = np.inf
+            dc_sum = np.inf
         else:
-            dc = distances[distances != np.inf].sum()
-        return dc
+            distances = distances[distances != np.inf]
+            dc_sum = distances.sum()
+        return dc_sum, len(distances)
 
     def estimate_mu_sigma(self, genes_from, genes_to, degree_diff=.5, samplings=100):
         print("Sampling equivalent sets")
@@ -88,23 +89,25 @@ class CalculateSeparation:
         )
 
         for i in range(samplings):
-            if i % samplings / 20 == 0:
+            if i % 20 == 0:
                 print(f"Sampling: {i} of {samplings}")
             eq_from = _sample_degree_equivalence(genes_from)
             eq_to = _sample_degree_equivalence(genes_to)
-            distances[i] = self.calculate_closest_distances(eq_from, eq_to)
+            dc_sum, dc_n = self.calculate_closest_distances(eq_from, eq_to)
+            distances[i] = dc_sum/dc_n
 
         print(f"{sum(distances == np.inf)} of {samplings} samplings ended without path between")
 
         distances = distances[distances != np.inf]  # remove those without a path between
-        return distances.mean(), distances.std()
+        return distances.sum(), len(distances), distances.std()
 
     def calculate_z_scores(self, from_genes, to_genes):
-        distance = self.calculate_closest_distances(from_genes, to_genes)
-        u, s = self.estimate_mu_sigma(from_genes, to_genes)
-        z = (distance - u) / s
+        dab_sum, dab_N = self.calculate_closest_distances(from_genes, to_genes)
+        d_sum, d_N, s = self.estimate_mu_sigma(from_genes, to_genes)
+        u = d_sum/d_N
+        z = (dab_sum/dab_N - u) / s
 
-        return distance, u, s, z
+        return dab_sum, dab_N, u, s, z
 
     def write_results(self, gene_file_a, gene_file_b, a_name, b_name, output_file):
         with open(gene_file_a, "r") as f:
@@ -118,10 +121,12 @@ class CalculateSeparation:
             w = open(output_file, "a")
         else:
             w = open(output_file, "w")
-            w.write("from\tto\tdc\tu\ts\tz\n")
+            w.write("from\tto\tdsum\tdN\tsab\tu\ts\tz\n")
 
-        distance, u, s, z = self.calculate_z_scores(genes_a, genes_b)
-        w.write(f"{a_name}\t{b_name}\t{distance}\t{u}\t{s}\t{z}\n")
+        dab_sum, dab_N, uab, sab, zab = self.calculate_z_scores(genes_a, genes_b)
+        dba_sum, dba_N, uba, sba, zba = self.calculate_z_scores(genes_b, genes_a)
 
-        distance, u, s, z = self.calculate_z_scores(genes_b, genes_a)
-        w.write(f"{b_name}\t{a_name}\t{distance}\t{u}\t{s}\t{z}\n")
+        sab = (dab_sum + dba_sum)/(dab_N + dba_N)
+
+        w.write(f"{a_name}\t{b_name}\t{dab_sum}\t{dab_N}\t{sab}\t{uab}\t{sab}\t{zab}\n")
+        w.write(f"{b_name}\t{a_name}\t{dba_sum}\t{dba_N}\t{sba}\t{uba}\t{sba}\t{zba}\n")

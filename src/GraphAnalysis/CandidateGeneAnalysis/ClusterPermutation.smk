@@ -10,9 +10,9 @@ rule permutation_results:
         n_permutations = 1000,
         fraction_forgotten = 0.1
     input:
-        edge_file = "work/{project}/term_to_term_probability_matrix.csv"
+        edge_file = "work/{project}/term_to_term_probability_matrix{method}.csv"
     output:
-        permutations = "work/{project}/clustering/metrics/permutations.csv"
+        permutations = "work/{project}/clustering/metrics/permutations{method}.csv"
     run:
         permutation_results_df = sc_norm_permutate(
             input.edge_file,
@@ -24,11 +24,11 @@ rule permutation_results:
 
 rule group_permutation_robustness:
     input:
-        edge_file = "work/{project}/term_to_term_probability_matrix.csv",
+        edge_file = "work/{project}/term_to_term_probability_matrix{method}.csv",
         node_positions = "data/Node_groups.csv",
-        permutations= "work/{project}/clustering/metrics/permutations.csv"
+        permutations= "work/{project}/clustering/metrics/permutations{method}.csv"
     output:
-        clustering_ratio = "work/{project}/clustering/metrics/sensitivity.csv"
+        clustering_ratio = "work/{project}/clustering/metrics/sensitivity{method}.csv"
     run:
         permutation_results_df = pd.read_csv(input.permutations, sep = "\t")
         node_vote_group_df = calculate_correct_node_ratio(
@@ -49,11 +49,11 @@ rule score_HPO:
         n_permutations = 1000,
         fraction_forgotten = 0.1
     input:
-        permutations = "work/{project}/clustering/metrics/permutations.csv",
+        permutations = "work/{project}/clustering/metrics/permutations{method}.csv",
         node_positions = "data/Node_groups.csv",
         drug_adr_csv = "data/hpo_pruned_med_directed.csv"
     output:
-        senes_hpo = "work/{project}/clustering/metrics/hpo_sensitivity.csv"
+        senes_hpo = "work/{project}/clustering/metrics/hpo_sensitivity{method}.csv"
     run:
         hpo_sensitivity_series = score_hpo_terms(input.permutations, input.node_positions, input.drug_adr_csv)
         with open(output.senes_hpo, "w") as w:
