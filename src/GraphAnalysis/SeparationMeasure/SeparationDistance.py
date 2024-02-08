@@ -89,8 +89,8 @@ class CalculateSeparation:
         )
 
         for i in range(samplings):
-            if i % 20 == 0:
-                print(f"Sampling: {i} of {samplings}")
+            # if i % 20 == 0:
+            #     print(f"Sampling: {i} of {samplings}")
             eq_from = _sample_degree_equivalence(genes_from)
             eq_to = _sample_degree_equivalence(genes_to)
             dc_sum, dc_n = self.calculate_closest_distances(eq_from, eq_to)

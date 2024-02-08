@@ -55,13 +55,15 @@ rule generate_z_scores:
         z_scores = "work/{project}/benchmarking/z_score/Affinity_zscore_batch_{n}.csv"
     run:
         with open(input.input_batch, "r") as f:
-            for line in f:
-                comb = line.strip().split("\t")
-
-                name_a = os.path.basename(comb[0]).replace(".csv", "")
-                name_b = os.path.basename(comb[1]).replace(".csv","")
-                cs = CalculateSeparation(params.ppi_file)
-                cs.write_results(comb[0], comb[1], name_a, name_b, output.z_scores)
+            combs =  [line.strip().split("\t") for line in f]
+        i = 0
+        for comb in combs:
+            print(f"Running combination {i} of {len(combs)} for batch number: {wildcards.n}")
+            i += 1
+            name_a = os.path.basename(comb[0]).replace(".csv", "")
+            name_b = os.path.basename(comb[1]).replace(".csv","")
+            cs = CalculateSeparation(params.ppi_file)
+            cs.write_results(comb[0], comb[1], name_a, name_b, output.z_scores)
 
 rule aggregate_results:
     input:

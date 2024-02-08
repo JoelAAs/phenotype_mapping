@@ -21,7 +21,8 @@ n_clusters = [
 ## Rule
 rule all:
     input:
-        expand("work/full-drugbank-benchmark/clustering/metrics/sensitivity{method}.csv", method = ["_zscore", "_sab"])
+        expand("work/full-drugbank-benchmark/clustering/metrics/sensitivity{method}.csv", method = ["_zscore", "_sab"]),
+        expand("work/HPO-pruned-benchmark/clustering/metrics/sensitivity{method}.csv", method =["_zscore", "_sab"])
         # expand("work/{project}/plots/clustering/SC_{n_clusters}.png",
         #     project=projects, n_clusters=n_clusters),
         # expand("work/{project}/plots/clustering/single_clusters_{n_clusters}/done.txt",
