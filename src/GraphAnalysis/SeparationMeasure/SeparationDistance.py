@@ -125,7 +125,7 @@ class CalculateSeparation:
         dab_sum, dab_N, uab, sab, zab = self.calculate_z_scores(genes_a, genes_b)
         dba_sum, dba_N, uba, sba, zba = self.calculate_z_scores(genes_b, genes_a)
 
-        sab = (dab_sum + dba_sum)/(dab_N + dba_N)
+        seperation = (dab_sum + dba_sum)/(dab_N + dba_N)
 
-        w.write(f"{a_name}\t{b_name}\t{dab_sum}\t{dab_N}\t{sab}\t{uab}\t{sab}\t{zab}\n")
-        w.write(f"{b_name}\t{a_name}\t{dba_sum}\t{dba_N}\t{sba}\t{uba}\t{sba}\t{zba}\n")
+        w.write(f"{a_name}\t{b_name}\t{dab_sum}\t{dab_N}\t{seperation}\t{uab}\t{sab}\t{zab}\n")
+        w.write(f"{b_name}\t{a_name}\t{dba_sum}\t{dba_N}\t{seperation}\t{uba}\t{sba}\t{zba}\n")
