@@ -107,12 +107,18 @@ rule PlotEnrichment:
 rule PlotPermutations:
     input:
         drug_permut = "work/full-drugbank/clustering/metrics/sensitivity.csv",
+        sab_drug_permut = "work/full-drugbank-benchmark/clustering/metrics/sensitivity_sab.csv",
+        zscore_drug_permut = "work/full-drugbank-benchmark/clustering/metrics/sensitivity_zscore.csv",
         adr_drug_permut = "work/MedAdr/clustering/metrics/sensitivity.csv",
-        adr_permut = "work/MedAdr/clustering/metrics/hpo_sensitivity.csv"
+        sab_adr_drug_permut = "work/MedAdr-benchmark/clustering/metrics/sensitivity_sab.csv",
+        zscore_adr_drug_permut = "work/MedAdr-benchmark/clustering/metrics/sensitivity_zscore.csv",
+        adr_permut= "work/MedAdr/clustering/metrics/hpo_sensitivity.csv",
+        sab_adr_permut = "work/MedAdr-benchmark/clustering/metrics/hpo_sensitivity_sab.csv",
+        zscore_adr_permut= "work/MedAdr-benchmark/clustering/metrics/hpo_sensitivity_zscore.csv"
     output:
         "work/meta_plots/Sensitivity.png"
     shell:
         """
-        Rscript src/GraphAnalysis/NetworkPlotting/NodeSensitivityPermutationPlot.R {input.drug_permut} {input.adr_drug_permut} {input.adr_permut} {output}
+        Rscript src/GraphAnalysis/NetworkPlotting/NodeSensitivityPermutationPlot.R {input} {output}
         """
 

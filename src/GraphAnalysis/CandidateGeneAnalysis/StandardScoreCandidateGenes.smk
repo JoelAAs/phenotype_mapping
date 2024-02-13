@@ -100,6 +100,3 @@ rule get_mean_and_var_cluster:
                 w.write(f"{gene}\t{mean}\t{var}\n")
 
 
-
-rule calculate_z_scores:
-    input:

@@ -11,7 +11,8 @@ n_clusters = [
 ]
 
 group = "NSAID"
-config["n_permut"] = 3
+config["n_permut"] = 100
+groups = ["Statin", "Antidepressant", "NSAID"]
 
 
 
@@ -20,13 +21,14 @@ include: "NetworkClusteringMethods/ClusterMetrics.smk"
 include: "CandidateGeneAnalysis/GeneWithinClusterProbability.smk"
 include: "NetworkPlotting/PlotGraphs.smk"
 include: "CandidateGeneAnalysis/ClusterPermutation.smk"
-include: "SeparationMeasure/Benchmarking.smk"
-include: "CandidateGeneAnalysis/StandardScoreCandidateGenes.smk"
+#include: "SeparationMeasure/Benchmarking.smk"
+#include: "CandidateGeneAnalysis/StandardScoreCandidateGenes.smk"
+include: "CandidateGeneAnalysis/GeneProbabilityZScore.smk"
 
 ## Rule
 rule all:
     input:
-        expand("work/{project}/candidate_genes/term_probabilities_groups/{group}_mean_var.csv", project= "test", group ="NSAID")
+        expand("work/full-drugbank-benchmark/group-z-scores/{group}_top.csv", group = groups)
         #expand("work/full-drugbank-benchmark/clustering/metrics/sensitivity{method}.csv", method = ["_zscore", "_sab"]),
         #expand("work/MedAdr-benchmark/clustering/metrics/sensitivity{method}.csv", method =["_zscore", "_sab"]),
         #expand("work/MedAdr-benchmark/clustering/metrics/hpo_sensitivity{method}.csv", method =["_zscore", "_sab"]),
