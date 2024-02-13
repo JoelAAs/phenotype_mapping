@@ -1,12 +1,13 @@
 import pandas as pd
-
+import networkx as nx
 from SeparationDistance import CalculateSeparation
+from DIAMOnD import DIAMOnD
 import glob
 from itertools import combinations
 import os
 from scipy.stats import norm
 
-n_batches = 8
+n_batches = 6
 
 projects = [
     #"HPO-pruned",
@@ -42,8 +43,6 @@ rule batch_combinations:
             w.write("\t".join(comb) + "\n")
             i +=1
         w.close()
-
-
 
 
 rule generate_z_scores:
@@ -93,7 +92,7 @@ rule translate_as_pd:
             {
                 "from": "query",
                 "to": "neighborhood",
-                "sab": "sab"}, axis=1
+                "sab": "probability"}, axis=1
         )
 
         sab_df.to_csv(output.edges_sab, sep = "\t", index=None)
@@ -105,3 +104,47 @@ rule translate_as_pd:
                 "probability": "probability"}, axis=1
         )
         z_df.to_csv(output.edges_z, sep = "\t", index=None)
+
+
+rule DIAMOnD_per_cluster:
+    params:
+        n_genes=200,
+        top_fraction = 0.7
+    input:
+        groups = "data/Node_groups.csv",
+        terms = lambda wc: get_benchmark_input(wc),
+        ppi_file = "data/9606.protein.links.v11.5.txt"
+    output:
+        diamond_groups = expand("work/{{project}}/benchmarking/DIAMOnD_{group}",
+            group=["Statin", "Antidepressant", "NSAID"])
+    run:
+        gene_dict = dict()
+        with open(input.groups, "r") as f:
+            for line in f.readlines()[1:]:
+                drug, group = line.strip().split("\t")
+                with open(f"input/full-drugbank/{drug}.csv", "r") as g:
+                    genes = {l.strip() for l in g.readlines()[1:]}
+                if group in gene_dict:
+                    gene_dict[group].union(genes)
+                else:
+                    gene_dict[group] = genes
+
+        edge_list_df = pd.read_csv(input.ppi_file, sep=" ")
+        edge_list_df["combined_score"] = edge_list_df["combined_score"] / 1000
+        edge_list_df = edge_list_df[edge_list_df["combined_score"] > params.top_fraction]
+        G_original = nx.from_pandas_edgelist(
+            edge_list_df,
+            "protein1",
+            "protein2",
+            create_using=nx.Graph
+        )
+        alpha = 1
+
+        for group in gene_dict:
+            outfile_name = f"work/{wildcards.project}/benchmarking/DIAMOnD_{group}"
+            seed_genes = gene_dict[group]
+            added_nodes = DIAMOnD(
+                G_original,
+                seed_genes,
+                params.n_genes, alpha,
+                outfile=outfile_name)

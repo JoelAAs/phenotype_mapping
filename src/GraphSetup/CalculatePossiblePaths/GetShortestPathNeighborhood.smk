@@ -1,14 +1,19 @@
 import pandas as pd
 import bz2
+import os
+import pathlib
+import glob
 
 rule unique_genes:
     output:
-        unique_genes = "work/{project}/unique_genes.csv"
+        unique_genes = expand("work/{{project}}/unique_genes_{n}.csv", n = range(config["n_path_batches"]))
     run:
-        with open(output.unique_genes, "w") as w:
-            w.write("Gene\n")
-            for gene in config["all_unique_genes"]:
-                w.write(f"{gene}\n")
+        for n in range(config["n_path_batches"]):
+            outfile = f"work/{wildcards.project}/unique_genes_{n}.csv"
+            with open(outfile, "w") as w:
+                w.write("Gene\n")
+                for gene in config["path_batches"][n]:
+                    w.write(f"{gene}\n")
 
 
 rule get_possible_paths_from_genes:
@@ -16,23 +21,43 @@ rule get_possible_paths_from_genes:
         max_depth = config["max_depth"]
     input:
         ppi_network_file = "data/9606.protein.links.v11.5.txt",
-        unique_genes = "work/{project}/unique_genes.csv"
+        unique_genes = "work/{project}/unique_genes_{n}.csv"
     output:
-        all_genes = expand(
-            "work/{{project}}/paths/{gene}_at_{depth}.csv",
-            gene = config["all_unique_genes"],
-            depth = range(1, config["max_depth"] + 1)
-        )
+        folder =  directory("work/{project}/paths_{n}")
     singularity:
         "data/igraph.simg"
     shell:
         """
-        python src/CalculatePossiblePaths/possible_paths_from_a.py \
+        mkdir -p {output.folder}
+        python3 src/GraphSetup/CalculatePossiblePaths/possible_paths_from_a.py \
             {input.unique_genes} \
             {input.ppi_network_file} \
-            "work/{wildcards.project}/paths" \
+            {output.folder} \
             {params.max_depth}
         """
+
+
+rule check_for_all_paths:
+    """
+    Delete batch_folders files if changes are made to code in possible_paths_from_a.py
+    """
+    input:
+        folders = expand("work/{{project}}/paths_{n}", n = range(config["n_path_batches"]))
+    output:
+        all_genes = expand(
+            "work/{{project}}/paths/{gene}_at_{depth}.csv",
+            gene=config["all_unique_genes"],
+            depth=range(1,config["max_depth"] + 1)
+        )
+    run:
+        for batch_folder in input.folders:
+            files = glob.glob(batch_folder + "/*")
+            for path_file in files:
+                path_filename = os.path.basename(path_file)
+                abs_path_file = os.path.abspath(path_file)
+                ln_file = f"work/{wildcards.project}/paths/{path_filename}"
+                shell(f"ln -s {abs_path_file} {ln_file}")
+
 
 rule guarantee_shortest_path:
     input:
@@ -47,9 +72,12 @@ rule guarantee_shortest_path:
 
 
 rule genes_in_path_neighborhood:
+    """
+    Calculates probabilities of picking gene out of all shortest paths originating from gene
+    """
     input:
         depth_genes = expand("work/{{project}}/paths/{{gene}}_at_{depth}_shortest.csv.bz2",
-            depth = range(1, config["max_depth"]))
+            depth = range(1, config["max_depth"] + 1))
     output:
         genes_in_paths = "work/{project}/neighborhood/{gene}_p_gene.csv.bz2"
     run:

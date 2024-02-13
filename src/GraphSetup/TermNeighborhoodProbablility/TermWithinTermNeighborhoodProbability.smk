@@ -1,7 +1,4 @@
-"work/{project}/term_gene_distance/full_matrix_{term2}_in_{term1}.csv"
-
 import pandas as pd
-import numpy as np
 from itertools import permutations
 
 def get_term_permutations(terms):

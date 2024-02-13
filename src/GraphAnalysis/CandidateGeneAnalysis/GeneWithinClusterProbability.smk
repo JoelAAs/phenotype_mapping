@@ -1,9 +1,9 @@
 import glob
 import os
 import bz2
-import numpy as np
 import pandas as pd
-from DIAMOnD import *
+import numpy as np
+# from src.GraphAnalysis.SeparationMeasure.DIAMOnD import *
 from ClusterGeneProbabilities import get_centrality_of_cluster_genes, get_occurrence_of_genes_in_terms
 
 # Config
@@ -124,62 +124,62 @@ rule get_stringid:
 
 
 
-rule Diamond:
-    params:
-        n_genes= 50
-    input:
-        cluster_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv",
-        ppi_cluster = "data/9606.protein.links_above_700.v11.5.txt",
-    output:
-        inferred_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/enriched/top_stringid_{cluster}.csv"
-    run:
-        input_list = ["", input.ppi_cluster, input.cluster_genes, params.n_genes, 1, output.inferred_genes]
-        network_edgelist_file, seeds_file, max_number_of_added_nodes, alpha, outfile_name = check_input_style(input_list)
-
-        G_original, seed_genes = read_input(network_edgelist_file, seeds_file)
-
-        added_nodes = DIAMOnD(
-            G_original,
-            seed_genes,
-            max_number_of_added_nodes, alpha,
-            outfile=outfile_name)
-
-
-rule translate_diamond:
-    input:
-        diamond_top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/enriched/top_stringid_{cluster}.csv",
-        seed_tops = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv",
-        entrez= "data/ncbi/entrez.csv",
-        string_id="data/stringdb/9606.protein.info.v11.5.txt",
-    output:
-        string_top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/top_{cluster}.csv",
-        translated_preffered= "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_gene_name{cluster}.csv"
-    run:
-        diamond_top = pd.read_csv(input.diamond_top, sep = "\t")
-        del diamond_top["#rank"]
-        del diamond_top["p_hyper"]
-        diamond_top = diamond_top.rename({"DIAMOnD_node": "gene"}, axis = 1)
-        seed_top = pd.read_csv(input.seed_tops, sep = "\t")
-        del seed_top["y_probability"]
-        del seed_top["logprob"]
-        all_top = pd.concat([diamond_top, seed_top])
-
-        entrez_df = pd.read_csv(input.entrez,sep="\t")
-        string_df = pd.read_csv(input.string_id,sep="\t")
-
-        string_top = diamond_top.merge(
-            string_df,
-            left_on="gene",
-            right_on="string_protein_id",
-            how="left")
-
-        entrez_top = string_top.merge(
-            entrez_df,
-            left_on="preferred_name",
-            right_on="gene_name",
-            how="left")
-
-        entrez_top["entrez"].to_csv(output.string_top,sep="\t",index=False)
+# rule Diamond:
+#     params:
+#         n_genes= 50
+#     input:
+#         cluster_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv",
+#         ppi_cluster = "data/9606.protein.links_above_700.v11.5.txt",
+#     output:
+#         inferred_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/enriched/top_stringid_{cluster}.csv"
+#     run:
+#         input_list = ["", input.ppi_cluster, input.cluster_genes, params.n_genes, 1, output.inferred_genes]
+#         network_edgelist_file, seeds_file, max_number_of_added_nodes, alpha, outfile_name = check_input_style(input_list)
+#
+#         G_original, seed_genes = read_input(network_edgelist_file, seeds_file)
+#
+#         added_nodes = DIAMOnD(
+#             G_original,
+#             seed_genes,
+#             max_number_of_added_nodes, alpha,
+#             outfile=outfile_name)
+#
+#
+# rule translate_diamond:
+#     input:
+#         diamond_top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/enriched/top_stringid_{cluster}.csv",
+#         seed_tops = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv",
+#         entrez= "data/ncbi/entrez.csv",
+#         string_id="data/stringdb/9606.protein.info.v11.5.txt",
+#     output:
+#         string_top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/top_{cluster}.csv",
+#         translated_preffered= "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_gene_name{cluster}.csv"
+#     run:
+#         diamond_top = pd.read_csv(input.diamond_top, sep = "\t")
+#         del diamond_top["#rank"]
+#         del diamond_top["p_hyper"]
+#         diamond_top = diamond_top.rename({"DIAMOnD_node": "gene"}, axis = 1)
+#         seed_top = pd.read_csv(input.seed_tops, sep = "\t")
+#         del seed_top["y_probability"]
+#         del seed_top["logprob"]
+#         all_top = pd.concat([diamond_top, seed_top])
+#
+#         entrez_df = pd.read_csv(input.entrez,sep="\t")
+#         string_df = pd.read_csv(input.string_id,sep="\t")
+#
+#         string_top = diamond_top.merge(
+#             string_df,
+#             left_on="gene",
+#             right_on="string_protein_id",
+#             how="left")
+#
+#         entrez_top = string_top.merge(
+#             entrez_df,
+#             left_on="preferred_name",
+#             right_on="gene_name",
+#             how="left")
+#
+#         entrez_top["entrez"].to_csv(output.string_top,sep="\t",index=False)
 
 rule probability_cutoff_and_entrez:
     params:
