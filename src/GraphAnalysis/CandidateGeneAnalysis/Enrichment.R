@@ -15,4 +15,9 @@ pathEnrich <- enrichKEGG(
     pvalueCutoff = 0.05,
     pAdjustMethod = "BH")
 
-write.table(pathEnrich@result, output_file, sep="\t")
+if (!is.null(pathEnrich)){
+    write.table(pathEnrich@result, output_file, sep="\t")    
+} else {
+    x <- data.frame(empty=character(0))
+    write.table(x, file=output_file)
+}

@@ -184,7 +184,8 @@ rule get_stringid:
 rule probability_cutoff_and_entrez:
     params:
         centrality_max = 0.3,
-        exclude_starting_terms = True
+        exclude_starting_terms = True,
+        top_n = 200
     input:
         entrez = "data/ncbi/entrez.csv",
         string_id= "data/stringdb/9606.protein.info.v11.5.txt",
@@ -194,19 +195,18 @@ rule probability_cutoff_and_entrez:
         translated_preffered = "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_gene_name{cluster}.csv",
     run:
         cluster_prob = pd.read_csv(input.cluster_probability, sep = "\t")
-        cluster_prob["centrality_norm"] = cluster_prob["centrality"]/cluster_prob["centrality"].max()
+        #cluster_prob["centrality_norm"] = cluster_prob["centrality"]/cluster_prob["centrality"].max()
 
 
-        cluster_prob["logprob"] = np.log10(cluster_prob["y_probability"]) # approx normal dist in logspace
-        mu = cluster_prob["logprob"].mean()
-        std = cluster_prob["logprob"].std()
+        # cluster_prob["logprob"] = np.log10(cluster_prob["y_probability"]) # approx normal dist in logspace
 
-        threshold = mu + std*2
-        cluster_prob = cluster_prob[cluster_prob["logprob"] > threshold]
-        cluster_prob = cluster_prob[cluster_prob["centrality_norm"] < params.centrality_max]
+        #cluster_prob = cluster_prob[cluster_prob["logprob"] > threshold]
+        #cluster_prob = cluster_prob[cluster_prob["centrality_norm"] < params.centrality_max]
 
         if params.exclude_starting_terms:
             cluster_prob = cluster_prob[cluster_prob["count"] == 0]
+
+        cluster_prob = cluster_prob.sort_values(by="y_probability", ascending=False)[:params.top_n]
 
         entrez_df = pd.read_csv(input.entrez, sep="\t")
         string_df = pd.read_csv(input.string_id, sep = "\t")

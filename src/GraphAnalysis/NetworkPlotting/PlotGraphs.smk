@@ -104,6 +104,18 @@ rule PlotEnrichment:
         Rscript src/GraphAnalysis/NetworkPlotting/Enrichmentplot.R {input} {output}
         """
 
+rule PlotEnrichment_Zmax:
+    input:
+        enrichments = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}_KEGG.csv"
+    output:
+        figure = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}_KEGG.png"
+    shell:
+        """
+        Rscript src/GraphAnalysis/NetworkPlotting/Enrichmentplot.R {input} {output}
+        """
+
+
+
 rule PlotPermutations:
     input:
         drug_permut = "work/full-drugbank/clustering/metrics/sensitivity.csv",
