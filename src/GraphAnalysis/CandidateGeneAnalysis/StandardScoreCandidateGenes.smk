@@ -1,5 +1,6 @@
 import bz2
 import numpy as np
+import random
 
 group_dict = dict()
 with open("data/Node_groups.csv", "r") as f:
@@ -101,6 +102,8 @@ def get_genes_in_permutset(wc):
 
 
 rule get_probs_permut_group:
+    params:
+        number_of_combinations = config["n_permutation_combinations"]
     input:
         term_mean_var = lambda wc: expand(
             "work/full-drugbank-benchmark/candidate_genes/term_probabilities/{term}_set_{n}_probabilities.csv",
@@ -110,8 +113,14 @@ rule get_probs_permut_group:
     run:
         group_terms = config[wildcards.group]
         permut_prob_dict = dict()
-        for i in range(config["n_permut"]):
-            for term in group_terms:
+        permutations_sets = set()
+        while len(permutations_sets) < params.number_of_combinations:
+            permutations_sets.add(tuple(random.sample(range(config["n_permut"]), k=len(group_terms))))
+        k = 0
+        for permut_set in permutations_sets:
+            print(f"{k} combination of {params.number_of_combinations}")
+            k += 1
+            for j, (term, i) in enumerate(zip(group_terms, list(permut_set))):
                 term_permut_file = f"work/full-drugbank-benchmark/candidate_genes/term_probabilities/{term}_set_{i}_probabilities.csv"
                 with open(term_permut_file, "r") as f:
                     for l in f.readlines()[1:]:
@@ -119,9 +128,9 @@ rule get_probs_permut_group:
                         prob = float(prob)
 
                         if gene not in permut_prob_dict:
-                            permut_prob_dict[gene] = np.zeros(config["n_permut"])
+                            permut_prob_dict[gene] = np.zeros(params.number_of_combinations)
 
-                        permut_prob_dict[gene][i] += prob/len(group_terms)
+                        permut_prob_dict[gene][j] += prob/len(group_terms)
 
         with open(output.cluster_prob, "w") as w:
             genes = list(permut_prob_dict.keys())

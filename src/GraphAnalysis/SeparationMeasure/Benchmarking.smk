@@ -108,14 +108,14 @@ rule translate_as_pd:
 
 rule DIAMOnD_per_cluster:
     params:
-        n_genes=200,
+        n_genes=250,
         top_fraction = 0.7
     input:
         groups = "data/Node_groups.csv",
         terms = lambda wc: get_benchmark_input(wc),
         ppi_file = "data/9606.protein.links.v11.5.txt"
     output:
-        diamond_groups = expand("work/{{project}}/benchmarking/DIAMOnD_{group}",
+        diamond_groups = expand("work/{{project}}/benchmarking/DIAMOnD_{group}.csv",
             group=["Statin", "Antidepressant", "NSAID"])
     run:
         gene_dict = dict()
@@ -141,7 +141,7 @@ rule DIAMOnD_per_cluster:
         alpha = 1
 
         for group in gene_dict:
-            outfile_name = f"work/{wildcards.project}/benchmarking/DIAMOnD_{group}"
+            outfile_name = f"work/{wildcards.project}/benchmarking/DIAMOnD_{group}.csv"
             seed_genes = gene_dict[group]
             added_nodes = DIAMOnD(
                 G_original,

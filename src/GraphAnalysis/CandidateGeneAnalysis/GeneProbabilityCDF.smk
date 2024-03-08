@@ -3,7 +3,7 @@ import os
 import numpy as np
 import pandas as pd
 import networkx as nx
-from scipy.stats import lognorm, gumbel_r
+from scipy.stats import lognorm, gumbel_r, weibull_min
 def get_components(wildcards):
     comp_check = checkpoints.get_connected_components.get(**wildcards).output[0]
     comps, = glob_wildcards(os.path.join(comp_check, "Component_{c}.csv"))
@@ -11,17 +11,18 @@ def get_components(wildcards):
     expected = f"work/full-drugbank-benchmark/group-quant/{wildcards.group}_connected_components_enrichment/Component_{{component}}_KEGG.png"
     return expand(expected, component = comps)
 
-rule get_zscores:
+rule get_CDF_of_genes:
     params:
         ppi_file = "data/9606.protein.links_above_700.v11.5.txt",
-        limit = 0.7
+        limit = 0.7,
+        n_permuts = config["n_permutation_combinations"]
     input:
         gene_probabilities = "data/full_drugbank_gene_probabilites/{group}_gene_probabilites.csv",
         set_permutations = "work/full-drugbank-benchmark/candidate_genes/group_gene_permut/{group}_permut.csv"
     output:
-        z_scores = "work/full-drugbank-benchmark/group-quant/{group}_quant.csv"
+        quant = "work/full-drugbank-benchmark/group-quant/{group}_quant.csv",
+
     run:
-        n_permuts = 100 # TODO: config later
         set_permut_dict = dict()
         with open(input.set_permutations, "r") as w:
             lines = w.readlines()[1:]
@@ -29,12 +30,13 @@ rule get_zscores:
                 gene, prob, i = l.strip().split("\t")
                 prob = float(prob)
                 if gene not in set_permut_dict:
-                    set_permut_dict[gene] = np.full(n_permuts, fill_value=0.0)
+                    set_permut_dict[gene] = np.full(params.n_permuts, fill_value=0.0)
                 set_permut_dict[gene][int(i)] = prob
 
-        all_data = np.full(len(set_permut_dict)*100, fill_value=0.0)
+        all_data = np.full(len(set_permut_dict)*params.n_permuts, fill_value=0.0)
         for i, (gene, probs) in enumerate(set_permut_dict.items()):
-            all_data[i*100:(i+1)*100] = probs
+            all_data[i*params.n_permuts:(i+1)*params.n_permuts] = probs
+
         mean_loc, mean_shape = gumbel_r.fit(all_data)
 
         # PPI Degree conf
@@ -58,31 +60,33 @@ rule get_zscores:
         mean_var_dict = dict()
         def get_sample_mean_var(gene):
             if gene not in set_permut_dict:
-                return mean_loc, mean_shape
+                return mean_loc, mean_shape, 1
             else:
                 probs = set_permut_dict[gene]
                 s_loc, s_scale = gumbel_r.fit(probs)
-            return s_loc, s_scale
+            return s_loc, s_scale, 0
 
         with open(input.gene_probabilities, "r") as f:
-            with open(output.z_scores, "w") as w:
-                w.write("Gene\ty_probability\tquant\tdegree\n")
+            with open(output.quant, "w") as w:
+                w.write("Gene\ty_probability\tquant\tdegree\tnot_reached\ts_loc\ts_scale\n")
                 lines = f.readlines()[1:]
-                genes = np.full(len(lines), fill_value="")
+                genes = np.full(len(lines), fill_value="",dtype=object)
                 for i, l in enumerate(lines):
                     gene, prob = l.strip().split("\t")
                     genes[i] = gene
                     prob = float(prob)
                     if gene in node_degree_dict:
-                        s_loc, s_scale = get_sample_mean_var(gene)
+                        s_loc, s_scale, missing = get_sample_mean_var(gene)
                         quant = gumbel_r.cdf(prob, loc=s_loc, scale=s_scale)
-                        w.write(f"{gene}\t{prob}\t{quant}\t{node_degree_dict[gene]}\n")
+                        w.write(f"{gene}\t{prob}\t{quant}\t{node_degree_dict[gene]}\t{missing}\t{s_loc}\t{s_scale}\n")
 
-                not_reached = [gene for gene in node_degree_dict.keys() if gene not in genes]
+                not_reached = [
+                    gene_node for gene_node in node_degree_dict.keys() if gene_node not in genes
+                ]
                 for gene_left in not_reached:
-                    s_loc, s_scale = get_sample_mean_var(gene)
+                    s_loc, s_scale, missing = get_sample_mean_var(gene_left)
                     quant = gumbel_r.cdf(0, loc=s_loc, scale=s_scale)
-                    w.write(f"{gene_left}\t{0}\t{quant}\t{node_degree_dict[gene_left]}\n")
+                    w.write(f"{gene_left}\t{0}\t{quant}\t{node_degree_dict[gene_left]}\t{missing}\t{s_loc}\t{s_scale}\n")
 
 
 rule get_top_values:
@@ -194,3 +198,55 @@ rule enrichment_done_components:
         """
         touch {output.done}
         """
+
+
+rule get_all_shortest_distances:
+    input:
+        quants = "work/full-drugbank-benchmark/group-quant/{group}_quant.csv",
+        unique_input = "data/full_drugbank_gene_probabilites/{group}_unique_genes.csv",
+        ppi_file = "data/9606.protein.links_above_700.v11.5.txt"
+    output:
+        distances = "work/full-drugbank-benchmark/group-quant/shortest_distances/{group}.csv"
+    run:
+        edge_list_df = pd.read_csv(input.ppi_file,sep=" ")
+        edge_list_df["combined_score"] = edge_list_df["combined_score"] / 1000
+        edge_list_df = edge_list_df[edge_list_df["combined_score"] >= 0.7]
+        G = nx.from_pandas_edgelist(
+            edge_list_df,
+            "protein1",
+            "protein2"
+        )
+        input_genes_df = pd.read_csv(input.unique_input,sep="\t")
+        genes_input = input_genes_df["gene"].tolist()
+        prob_genes_df = pd.read_csv(input.quants, sep = "\t")
+        genes_to = prob_genes_df["Gene"].tolist()
+        with open(output.distances, "w") as w:
+            w.write("input_gene\ttarget_gene\tdistance\n")
+            for i, gene_input in enumerate(genes_input):
+                print(f"{i} of {len(genes_input)}")
+                for gene_to in genes_to:
+                    try:
+                        d = nx.shortest_path_length(
+                            G,
+                            source=gene_input,
+                            target=gene_to
+                        )
+                        w.write(f"{gene_input}\t{gene_to}\t{d}\n")
+                    except nx.NetworkXNoPath as e:
+                        pass
+
+rule get_average_shortest_distances:
+    input:
+        distances = "work/full-drugbank-benchmark/group-quant/shortest_distances/{group}.csv",
+        counts = "data/full_drugbank_gene_probabilites/{group}_count_unique_genes.csv"
+    output:
+        mean_dist = "work/full-drugbank-benchmark/group-quant/shortest_distances/{group}_proportinal.csv"
+    run:
+        mean_dist_df = pd.read_csv(input.counts, sep="\t")
+        mean_dist_df["proportion"] = mean_dist_df.Count/mean_dist_df.Count.sum()
+        distances_df = pd.read_csv(input.distances, sep="\t")
+        distances_count_df = distances_df.merge(mean_dist_df, left_on="input_gene", right_on="Gene")
+        distances_count_df["proportional_distance"] = distances_count_df["proportion"]*distances_count_df["distance"]
+        proportional_distances = distances_count_df.groupby("target_gene", as_index=False)["proportional_distance"].sum()
+        proportional_distances.to_csv(output.mean_dist, sep="\t", index=False)
+
