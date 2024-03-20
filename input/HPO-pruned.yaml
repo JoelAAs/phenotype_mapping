@@ -1,3 +1,3 @@
 project_name: "HPO-pruned"
 max_depth: 4
-n_path_batches: 1 
+n_path_batches: 1
