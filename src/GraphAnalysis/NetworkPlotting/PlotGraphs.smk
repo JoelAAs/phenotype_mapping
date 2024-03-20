@@ -104,7 +104,7 @@ rule PlotEnrichment:
         Rscript src/GraphAnalysis/NetworkPlotting/Enrichmentplot.R {input} {output}
         """
 
-rule PlotEnrichment_Zmax:
+rule PlotEnrichment_LCC:
     input:
         enrichments = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}_KEGG.csv"
     output:
@@ -119,12 +119,15 @@ rule PlotEnrichment_Zmax:
 rule PlotPermutations:
     input:
         drug_permut = "work/full-drugbank/clustering/metrics/sensitivity.csv",
+        drug_permut_norm= "work/full-drugbank/clustering/metrics/sensitivity_norm.csv",
         sab_drug_permut = "work/full-drugbank-benchmark/clustering/metrics/sensitivity_sab.csv",
         zscore_drug_permut = "work/full-drugbank-benchmark/clustering/metrics/sensitivity_zscore.csv",
         adr_drug_permut = "work/MedAdr/clustering/metrics/sensitivity.csv",
+        adr_drug_permut_norm= "work/MedAdr/clustering/metrics/sensitivity_norm.csv",
         sab_adr_drug_permut = "work/MedAdr-benchmark/clustering/metrics/sensitivity_sab.csv",
         zscore_adr_drug_permut = "work/MedAdr-benchmark/clustering/metrics/sensitivity_zscore.csv",
         adr_permut= "work/MedAdr/clustering/metrics/hpo_sensitivity.csv",
+        adr_permut_norm= "work/MedAdr/clustering/metrics/hpo_sensitivity_norm.csv",
         sab_adr_permut = "work/MedAdr-benchmark/clustering/metrics/hpo_sensitivity_sab.csv",
         zscore_adr_permut= "work/MedAdr-benchmark/clustering/metrics/hpo_sensitivity_zscore.csv"
     output:

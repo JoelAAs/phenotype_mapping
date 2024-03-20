@@ -7,6 +7,7 @@ from scipy.stats import lognorm, gumbel_r, weibull_min
 def get_components(wildcards):
     comp_check = checkpoints.get_connected_components.get(**wildcards).output[0]
     comps, = glob_wildcards(os.path.join(comp_check, "Component_{c}.csv"))
+    print(comps)
 
     expected = f"work/full-drugbank-benchmark/group-quant/{wildcards.group}_connected_components_enrichment/Component_{{component}}_KEGG.png"
     return expand(expected, component = comps)

@@ -29,18 +29,15 @@ if (nrow(cluster_enrichment) != 0) {
       linetype = "dashed") +
     geom_text_repel(
       label = ifelse(cluster_enrichment$show_label & cluster_enrichment$sig, cluster_enrichment$Description, ""),
-      max.overlaps = Inf,force=12, point.padding = 2, nudge_y = 3, nudge_x = 0.025,color="black") +
+      max.overlaps = Inf,force=12, point.padding = 2, nudge_y = 3, nudge_x = 0.025, color="black", size=2.5) +
     theme(
-      axis.text=element_text(size=8),
-      axis.title=element_text(size=16),
-      plot.title=element_text(size=20),
-      strip.text = element_text(size=12),
       legend.position = "none"
     )
 
 
-  ggsave(output_file, g , dpi = 300)
+  ggsave(output_file, g , dpi = 300, height = 85, width = 85, units = "mm")
 } else {
+  # Snakemake wants output
   g <- ggplot() + theme_void()
   ggsave(output_file, g , dpi = 300)
 }
