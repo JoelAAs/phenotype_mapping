@@ -118,15 +118,15 @@ rule PlotEnrichment_LCC:
 
 rule PlotPermutations:
     input:
-        drug_permut = "work/full-drugbank/clustering/metrics/sensitivity.csv",
+        drug_permut = "work/full-drugbank/clustering/metrics/sensitivity_inbew.csv",
         drug_permut_norm= "work/full-drugbank/clustering/metrics/sensitivity_norm.csv",
         sab_drug_permut = "work/full-drugbank-benchmark/clustering/metrics/sensitivity_sab.csv",
         zscore_drug_permut = "work/full-drugbank-benchmark/clustering/metrics/sensitivity_zscore.csv",
-        adr_drug_permut = "work/MedAdr/clustering/metrics/sensitivity.csv",
+        adr_drug_permut = "work/MedAdr/clustering/metrics/sensitivity_inbew.csv",
         adr_drug_permut_norm= "work/MedAdr/clustering/metrics/sensitivity_norm.csv",
         sab_adr_drug_permut = "work/MedAdr-benchmark/clustering/metrics/sensitivity_sab.csv",
         zscore_adr_drug_permut = "work/MedAdr-benchmark/clustering/metrics/sensitivity_zscore.csv",
-        adr_permut= "work/MedAdr/clustering/metrics/hpo_sensitivity.csv",
+        adr_permut= "work/MedAdr/clustering/metrics/hpo_sensitivity_inbew.csv",
         adr_permut_norm= "work/MedAdr/clustering/metrics/hpo_sensitivity_norm.csv",
         sab_adr_permut = "work/MedAdr-benchmark/clustering/metrics/hpo_sensitivity_sab.csv",
         zscore_adr_permut= "work/MedAdr-benchmark/clustering/metrics/hpo_sensitivity_zscore.csv"

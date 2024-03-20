@@ -41,5 +41,5 @@ include: "TermNeighborhoodProbablility/TermWithinTermNeighborhoodProbability.smk
 ## Rule
 rule all:
     input:
-        expand("work/{project}/neighborhood/{gene}_p_gene.csv.bz2", project = project_name, gene = all_unique_genes)
-        # "work/{project}/term_to_term_probability_matrix.csv".format(project = config["project_name"])
+        #expand("work/{project}/neighborhood/{gene}_p_gene.csv.bz2", project = project_name, gene = all_unique_genes),
+        "work/{project}/term_to_term_probability_matrix.csv".format(project = config["project_name"])

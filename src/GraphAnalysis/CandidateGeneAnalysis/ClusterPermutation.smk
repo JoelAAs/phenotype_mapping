@@ -2,7 +2,6 @@ import pandas as pd
 from PermutationAnalysis import sc_norm_permutate, calculate_correct_node_ratio, score_hpo_terms
 
 
-# TODO: Make hpo node scoring based on connected nodes
 
 rule permutation_results:
     params:
@@ -21,6 +20,16 @@ rule permutation_results:
             fraction_forgotten=params.fraction_forgotten
         )
         permutation_results_df.to_csv(output.permutations, sep="\t", index=False)
+
+rule empty_wildcard_workaround:
+    input:
+        edge_file = "work/{project}/term_to_term_probability_matrix.csv"
+    output:
+        edge_file = "work/{project}/term_to_term_probability_matrix_inbew.csv"
+    shell:
+        """
+        cp {input} {output}
+        """
 
 rule group_permutation_robustness:
     input:
