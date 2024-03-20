@@ -285,3 +285,19 @@ rule get_centrality_and_frequnece_done:
         """
         touch {output}
         """
+
+rule get_norm_term_to_term_matrix:
+    input:
+        hpo = "work/HPO-pruned/term_to_term_probability_matrix.csv",
+        drug = "work/full-drugbank/term_to_term_probability_matrix.csv"
+    output:
+        hpo_norm = "work/HPO-pruned/term_to_term_probability_matrix_norm.csv",
+        drug_norm = "work/full-drugbank/term_to_term_probability_matrix_norm.csv"
+    run:
+        hpo_df = pd.read_csv(input.hpo, sep = "\t")
+        hpo_df["probability"] = hpo_df["probability"]/max(hpo_df["probability"])
+        hpo_df.to_csv(output.hpo_norm, sep="\t", index=None)
+
+        drug_df = pd.read_csv(input.drug,sep="\t")
+        drug_df["probability"] = drug_df["probability"] / max(drug_df["probability"])
+        drug_df.to_csv(output.drug_norm,sep="\t",index=None)
