@@ -18,6 +18,9 @@ Code ran on the following packages:
   - `gridExtra 2.3`
   - `clusterProfiler 4.10.1`
 
+### Data
+Please download human protein-protein interactions from StringDB. This analysis was done on version 11.5.
+Place the links file in `data`. If using another version change the path to the file among the snakemake rules or rename it to `data/9606.protein.links.v11.5.txt`
 ## Replication
 
 ### Calculate interaction based edge affinity for ADR and drug networks
