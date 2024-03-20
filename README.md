@@ -63,7 +63,7 @@ First we calculate the `CDF(Zd)` affinity, the `Sab` affinity and normalised pro
 snakemake -s src/GraphAnalysis/SnakeFileanalysis.smk -c 6  \
  work/full-drugbank-benchmark/term_to_term_probability_matrix_zscore.csv \
  work/HPO-pruned-benchmark/term_to_term_probability_matrix_zscore.csv \
- "work/full-drugbank/term_to_term_probability_matrix_norm.csv"
+ work/full-drugbank/term_to_term_probability_matrix_norm.csv
 ```
 
 First we obtain the clusters from `full-drugbank` and `MedAdr`:
