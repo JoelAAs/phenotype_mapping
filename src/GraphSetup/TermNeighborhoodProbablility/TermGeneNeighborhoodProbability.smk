@@ -62,7 +62,7 @@ rule full_term_to_term_matrix:
         query_term_geneset = "input/{project}/{term2}.csv",
         term_distances = get_genes_in_query
     output:
-        full_matrix = "work/{project}/term_gene_distance/full_m2atrix_{term2}_in_{term1}.csv"
+        full_matrix = "work/{project}/term_gene_distance/full_matrix_{term2}_in_{term1}.csv"
     run:
         df_list = []
         first = True
