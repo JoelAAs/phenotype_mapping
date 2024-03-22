@@ -21,6 +21,9 @@ Code ran on the following packages:
 ### Data
 Please download human protein-protein interactions from StringDB. This analysis was done on version 11.5.
 Place the links file in `data`. If using another version change the path to the file among the snakemake rules or rename it to `data/9606.protein.links.v11.5.txt`
+
+The gene-drug association data under `input/full-drugbank/` is from https://go.drugbank.com/ (accessed May 2022) and any proteins not present in `data/9606.protein.links.v11.5.txt` with a combined score (StringDB internal scoreing) below 700 have been removed.
+The gene-HPO association data under `input/HPO-pruned/` is form  https://hpo.jax.org (accessed July 2023).
 ## Replication
 
 ### Calculate interaction based edge affinity for ADR and drug networks
