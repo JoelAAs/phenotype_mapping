@@ -7,7 +7,6 @@ import numpy as np
 from ClusterGeneProbabilities import get_centrality_of_cluster_genes, get_occurrence_of_genes_in_terms
 
 # Config
-
 for project in config["projects"]:
     terms = glob.glob(f"input/{project}/*.csv")
     terms = [t.split("/")[2].replace(".csv", "") for t in terms]
@@ -70,7 +69,8 @@ checkpoint gene_in_cluster_probability_aggregation:
                     cluster_dict[cluster] = [node]
 
         for cluster in cluster_dict:
-            probability_dict = {}
+            probability_dict = dict()
+            unique_input_genes = set()
             for node in cluster_dict[cluster]:
                 print(f"Node: {node} for cluster {cluster}")
                 for project in config["projects"]:
@@ -81,6 +81,7 @@ checkpoint gene_in_cluster_probability_aggregation:
                 with open(f"input/{project_input}/{node}.csv", "r") as f:
                     genes = [l.strip() for l in f][1:]
                     for gene in genes:
+                        unique_input_genes += gene
                         with bz2.open(f"work/{project_input}/neighborhood/{gene}_p_gene.csv.bz2", "r") as f:
                             header= True
                             for line in f:
@@ -93,6 +94,11 @@ checkpoint gene_in_cluster_probability_aggregation:
                                         probability_dict[gene] += p_gene_path
                                     else:
                                         probability_dict[gene] = p_gene_path
+
+            with open(f"work/{wildcards.project}/candidate_genes/probabilities_{wildcards.n_clusters}/unique_input_{cluster}.csv", "w") as w:
+                w.write("gene\n")
+                for gene in unique_input_genes:
+                    w.write(f"{gene}\n")
 
             with open(f"work/{wildcards.project}/candidate_genes/probabilities_{wildcards.n_clusters}/cluster_{cluster}.csv", "w") as w:
                 w.write("gene\ty_probability\n")
@@ -122,64 +128,6 @@ rule get_stringid:
         cluster_prob = cluster_prob[cluster_prob["centrality_norm"] < params.centrality_max]
         top_df.to_csv(output.top, index=False, sep = "\t")
 
-
-
-# rule Diamond:
-#     params:
-#         n_genes= 50
-#     input:
-#         cluster_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv",
-#         ppi_cluster = "data/9606.protein.links_above_700.v11.5.txt",
-#     output:
-#         inferred_genes = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/enriched/top_stringid_{cluster}.csv"
-#     run:
-#         input_list = ["", input.ppi_cluster, input.cluster_genes, params.n_genes, 1, output.inferred_genes]
-#         network_edgelist_file, seeds_file, max_number_of_added_nodes, alpha, outfile_name = check_input_style(input_list)
-#
-#         G_original, seed_genes = read_input(network_edgelist_file, seeds_file)
-#
-#         added_nodes = DIAMOnD(
-#             G_original,
-#             seed_genes,
-#             max_number_of_added_nodes, alpha,
-#             outfile=outfile_name)
-#
-#
-# rule translate_diamond:
-#     input:
-#         diamond_top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/enriched/top_stringid_{cluster}.csv",
-#         seed_tops = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/input/string_top_{cluster}.csv",
-#         entrez= "data/ncbi/entrez.csv",
-#         string_id="data/stringdb/9606.protein.info.v11.5.txt",
-#     output:
-#         string_top = "work/{project}/candidate_genes/enrichment_{n_clusters}/diamond/top_{cluster}.csv",
-#         translated_preffered= "work/{project}/candidate_genes/enrichment_{n_clusters}/top/top_gene_name{cluster}.csv"
-#     run:
-#         diamond_top = pd.read_csv(input.diamond_top, sep = "\t")
-#         del diamond_top["#rank"]
-#         del diamond_top["p_hyper"]
-#         diamond_top = diamond_top.rename({"DIAMOnD_node": "gene"}, axis = 1)
-#         seed_top = pd.read_csv(input.seed_tops, sep = "\t")
-#         del seed_top["y_probability"]
-#         del seed_top["logprob"]
-#         all_top = pd.concat([diamond_top, seed_top])
-#
-#         entrez_df = pd.read_csv(input.entrez,sep="\t")
-#         string_df = pd.read_csv(input.string_id,sep="\t")
-#
-#         string_top = diamond_top.merge(
-#             string_df,
-#             left_on="gene",
-#             right_on="string_protein_id",
-#             how="left")
-#
-#         entrez_top = string_top.merge(
-#             entrez_df,
-#             left_on="preferred_name",
-#             right_on="gene_name",
-#             how="left")
-#
-#         entrez_top["entrez"].to_csv(output.string_top,sep="\t",index=False)
 
 rule probability_cutoff_and_entrez:
     params:

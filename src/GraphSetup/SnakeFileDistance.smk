@@ -1,7 +1,7 @@
 import glob
 import os
 
-## Config
+#### Config
 project_name = config["project_name"]
 terms = []
 all_unique_genes = set()
@@ -33,13 +33,32 @@ config["path_batches"] = batch_path_dict
 config["terms"] = terms
 config["all_unique_genes"] = list(all_unique_genes)
 
+
+#### Expected output config:
+output = []
+if "permutation_folder" in config:
+    print("Generating permutation set, please run:")
+    print(f"snakemake -s src/GraphSetup/SnakeFileDistance.smk -c 6  --configfile input/{config['permutation_folder']}.yaml")
+    print("Upon completion.")
+    permutations = expand("input/{permutation_folder}/{term}_set_{n}.csv",
+        permutation_folder=config['permutation_folder'],
+        n=range(config["permutation_N"]),
+        term=config["terms"]),
+    permutation_config = "input/{permutation_folder}.yaml".format(permutation_folder=config["permutation_folder"]),
+    output += permutations
+    output.append(permutation_config)
+    include: "GenerateRandomSets/GeneratePermutSets.smk"
+
+output.append("work/{project}/term_to_term_probability_matrix.csv".format(project = config["project_name"]))
+
+
 include: "CalculatePossiblePaths/GetShortestPathNeighborhood.smk"
 include: "TermNeighborhoodProbablility/TermGeneNeighborhoodProbability.smk"
 include: "TermNeighborhoodProbablility/TermWithinTermNeighborhoodProbability.smk"
 
 
+
 ## Rule
 rule all:
     input:
-        #expand("work/{project}/neighborhood/{gene}_p_gene.csv.bz2", project = project_name, gene = all_unique_genes),
-        "work/{project}/term_to_term_probability_matrix.csv".format(project = config["project_name"])
+        output

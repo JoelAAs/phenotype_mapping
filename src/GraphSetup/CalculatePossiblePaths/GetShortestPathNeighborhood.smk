@@ -18,9 +18,9 @@ rule unique_genes:
 
 rule get_possible_paths_from_genes:
     params:
-        max_depth = config["max_depth"]
+        max_depth = config["max_depth"],
+        ppi_network_file= config["ppi_file"]
     input:
-        ppi_network_file = "data/9606.protein.links.v11.5.txt",
         unique_genes = "work/{project}/unique_genes_{n}.csv"
     output:
         folder =  directory("work/{project}/paths_{n}")
@@ -31,7 +31,7 @@ rule get_possible_paths_from_genes:
         mkdir -p {output.folder}
         python3 src/GraphSetup/CalculatePossiblePaths/possible_paths_from_a.py \
             {input.unique_genes} \
-            {input.ppi_network_file} \
+            {params.ppi_network_file} \
             {output.folder} \
             {params.max_depth}
         """

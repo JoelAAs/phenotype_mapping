@@ -3,25 +3,25 @@ import os
 import numpy as np
 import pandas as pd
 import networkx as nx
-from scipy.stats import lognorm, gumbel_r, weibull_min
+from scipy.stats import gumbel_r
 def get_components(wildcards):
     comp_check = checkpoints.get_connected_components.get(**wildcards).output[0]
     comps, = glob_wildcards(os.path.join(comp_check, "Component_{c}.csv"))
     print(comps)
 
-    expected = f"work/full-drugbank-benchmark/group-quant/{wildcards.group}_connected_components_enrichment/Component_{{component}}_KEGG.png"
+    expected = f"work/{wildcards.project}/group-quant_{wildcards.n_cluster}/{wildcards.cluster}_connected_components_enrichment/Component_{{component}}_KEGG.png"
     return expand(expected, component = comps)
 
 rule get_CDF_of_genes:
     params:
-        ppi_file = "data/9606.protein.links_above_700.v11.5.txt",
-        limit = 0.7,
+        limit= config["combined_score_threshold"],
+        ppi_network_file=config["ppi_file"],
         n_permuts = config["n_permutation_combinations"]
     input:
-        gene_probabilities = "data/full_drugbank_gene_probabilites/{group}_gene_probabilites.csv",
-        set_permutations = "work/full-drugbank-benchmark/candidate_genes/group_gene_permut/{group}_permut.csv"
+        gene_probabilities = "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv",
+        set_permutations = "work/{permutation_project}/candidate_genes/cluster_gene_permutations_{{n_clusters}}/{{cluster}}_probability.csv".format(permutation_project=config["permutation_folder"])
     output:
-        quant = "work/full-drugbank-benchmark/group-quant/{group}_quant.csv",
+        quant = "work/{project}/group-quant_{n_clusters}/{cluster}_quant.csv"
 
     run:
         set_permut_dict = dict()
@@ -41,7 +41,7 @@ rule get_CDF_of_genes:
         mean_loc, mean_shape = gumbel_r.fit(all_data)
 
         # PPI Degree conf
-        edge_list_df = pd.read_csv(params.ppi_file,sep=" ")
+        edge_list_df = pd.read_csv(params.ppi_network_file,sep=" ")
         edge_list_df["combined_score"] = edge_list_df["combined_score"] / 1000
         edge_list_df = edge_list_df[edge_list_df["combined_score"] >= params.limit]
         G = nx.from_pandas_edgelist(
@@ -96,36 +96,36 @@ rule get_top_values:
         string_names = "data/stringdb/9606.protein.info.v11.5.txt",
         keep_input = True
     input:
-        z_scores = "work/full-drugbank-benchmark/group-quant/{group}_quant.csv",
-        unique_input = "data/full_drugbank_gene_probabilites/{group}_unique_genes.csv"
+        cdf_scores = "work/{project}/group-quant_{n_clusters}/{cluster}_quant.csv",
+        unique_input="work/{project}/candidate_genes/probabilities_{n_clusters}/unique_input_{cluster}.csv"
     output:
-        top_z_scores = "work/full-drugbank-benchmark/group-quant/{group}_top.csv"
+        top_cdf_scores = "work/{project}/group-quant_{n_clusters}/{cluster}_top.csv"
     run:
-        z_scores = pd.read_csv(input.z_scores, sep="\t")
+        cdf_scores = pd.read_csv(input.cdf_scores, sep="\t")
         with open(input.unique_input, "r") as f:
             input_genes = [g.strip() for g in f.readlines()[1:]]
 
         string_df = pd.read_csv(params.string_names, sep = "\t")[["string_protein_id", "preferred_name"]]
-        z_scores = z_scores.merge(string_df, left_on="Gene", right_on="string_protein_id", how="left")
+        cdf_scores = cdf_scores.merge(string_df, left_on="Gene", right_on="string_protein_id", how="left")
         if not params.keep_input:
-            z_scores = z_scores[~z_scores["Gene"].isin(input_genes)]
-        del z_scores["string_protein_id"]
-        z_scores_top = z_scores.sort_values(by="quant", ascending=False)[:(params.n_top + len(input_genes))]
-        z_scores_top.to_csv(output.top_z_scores, index=False, sep = "\t")
+            cdf_scores = cdf_scores[~cdf_scores["Gene"].isin(input_genes)]
+        del cdf_scores["string_protein_id"]
+        cdf_scores_top = cdf_scores.sort_values(by="quant", ascending=False)[:(params.n_top + len(input_genes))]
+        cdf_scores_top.to_csv(output.top_cdf_scores, index=False, sep = "\t")
 
 
 checkpoint get_connected_components:
     params:
         min_subgraph_size = 3,
-        ppi_file = "data/9606.protein.links.v11.5.txt",
-        limit = 0.7
+        limit= config["combined_score_threshold"],
+        ppi_network_file=config["ppi_file"]
     input:
-        top_z_scores = "work/full-drugbank-benchmark/group-quant/{group}_top.csv",
+        top_cdf_scores = "work/{project}/group-quant_{n_clusters}/{cluster}_top.csv",
     output:
-        output_dir = directory("work/full-drugbank-benchmark/group-quant/{group}_top_connected_components")
+        output_dir = directory("work/{project}/group-quant_{n_clusters}/{cluster}_top_connected_components")
     run:
 
-        edge_list_df = pd.read_csv(params.ppi_file,sep=" ")
+        edge_list_df = pd.read_csv(params.ppi_network_file,sep=" ")
         edge_list_df["combined_score"] = edge_list_df["combined_score"] / 1000
         edge_list_df = edge_list_df[edge_list_df["combined_score"] >= params.limit]
         G = nx.from_pandas_edgelist(
@@ -133,7 +133,7 @@ checkpoint get_connected_components:
             "protein1",
             "protein2"
         )
-        top_df = pd.read_csv(input.top_z_scores, sep="\t")
+        top_df = pd.read_csv(input.top_cdf_scores, sep="\t")
         keep_genes = set(top_df["Gene"])
         remove_nodes = [n for n in G.nodes() if n not in keep_genes]
         G.remove_nodes_from(remove_nodes)
@@ -150,20 +150,21 @@ checkpoint get_connected_components:
                         w.write(gene + "\n")
 
 rule remove_input_and_translate_to_entrez:
+    params:
+        entrez = "data/ncbi/entrez.csv",
+        string_id = "data/stringdb/9606.protein.info.v11.5.txt"
     input:
-        unique_input = "data/full_drugbank_gene_probabilites/{group}_unique_genes.csv",
-        entrez= "data/ncbi/entrez.csv",
-        string_id="data/stringdb/9606.protein.info.v11.5.txt",
-        components = "work/full-drugbank-benchmark/group-quant/{group}_top_connected_components/Component_{component}.csv"
+        unique_input = "work/{project}/candidate_genes/probabilities_{n_clusters}/unique_input_{cluster}.csv",
+        components = "work/{project}/group-quant_{n_clusters}/{cluster}_top_connected_components/Component_{component}.csv"
     output:
-        translated = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}.csv",
+        translated = "work/{project}/group-quant_{n_clusters}/{cluster}_connected_components_enrichment/Component_{component}.csv",
     run:
         with open(input.unique_input, "r") as f:
             input_genes = [l.strip() for l in f.readlines()[1:]]
 
         components_genes = pd.read_csv(input.components, sep = "\t")
-        entrez_df = pd.read_csv(input.entrez, sep="\t")
-        string_df = pd.read_csv(input.string_id, sep = "\t")
+        entrez_df = pd.read_csv(params.entrez, sep="\t")
+        string_df = pd.read_csv(params.string_id, sep = "\t")
 
         string_genes = components_genes.merge(
             string_df,
@@ -181,9 +182,9 @@ rule remove_input_and_translate_to_entrez:
 
 rule component_KEGG_enrich:
     input:
-        translated = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}.csv"
+        translated = "work/{project}/group-quant_{n_clusters}/{cluster}_connected_components_enrichment/Component_{component}.csv"
     output:
-        results = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}_KEGG.csv",
+        results = "work/{project}/group-quant_{n_clusters}/{cluster}_connected_components_enrichment/Component_{component}_KEGG.csv",
     shell:
         """
         Rscript src/GraphAnalysis/CandidateGeneAnalysis/Enrichment.R {input} {output}
@@ -194,60 +195,9 @@ rule enrichment_done_components:
     input:
         get_components
     output:
-        done = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/done.csv"
+        done = "work/{project}/group-quant_{n_clusters}/{group}_connected_components_enrichment/done.csv"
     shell:
         """
         touch {output.done}
         """
-
-
-rule get_all_shortest_distances:
-    input:
-        quants = "work/full-drugbank-benchmark/group-quant/{group}_quant.csv",
-        unique_input = "data/full_drugbank_gene_probabilites/{group}_unique_genes.csv",
-        ppi_file = "data/9606.protein.links_above_700.v11.5.txt"
-    output:
-        distances = "work/full-drugbank-benchmark/group-quant/shortest_distances/{group}.csv"
-    run:
-        edge_list_df = pd.read_csv(input.ppi_file,sep=" ")
-        edge_list_df["combined_score"] = edge_list_df["combined_score"] / 1000
-        edge_list_df = edge_list_df[edge_list_df["combined_score"] >= 0.7]
-        G = nx.from_pandas_edgelist(
-            edge_list_df,
-            "protein1",
-            "protein2"
-        )
-        input_genes_df = pd.read_csv(input.unique_input,sep="\t")
-        genes_input = input_genes_df["gene"].tolist()
-        prob_genes_df = pd.read_csv(input.quants, sep = "\t")
-        genes_to = prob_genes_df["Gene"].tolist()
-        with open(output.distances, "w") as w:
-            w.write("input_gene\ttarget_gene\tdistance\n")
-            for i, gene_input in enumerate(genes_input):
-                print(f"{i} of {len(genes_input)}")
-                for gene_to in genes_to:
-                    try:
-                        d = nx.shortest_path_length(
-                            G,
-                            source=gene_input,
-                            target=gene_to
-                        )
-                        w.write(f"{gene_input}\t{gene_to}\t{d}\n")
-                    except nx.NetworkXNoPath as e:
-                        pass
-
-rule get_average_shortest_distances:
-    input:
-        distances = "work/full-drugbank-benchmark/group-quant/shortest_distances/{group}.csv",
-        counts = "data/full_drugbank_gene_probabilites/{group}_count_unique_genes.csv"
-    output:
-        mean_dist = "work/full-drugbank-benchmark/group-quant/shortest_distances/{group}_proportinal.csv"
-    run:
-        mean_dist_df = pd.read_csv(input.counts, sep="\t")
-        mean_dist_df["proportion"] = mean_dist_df.Count/mean_dist_df.Count.sum()
-        distances_df = pd.read_csv(input.distances, sep="\t")
-        distances_count_df = distances_df.merge(mean_dist_df, left_on="input_gene", right_on="Gene")
-        distances_count_df["proportional_distance"] = distances_count_df["proportion"]*distances_count_df["distance"]
-        proportional_distances = distances_count_df.groupby("target_gene", as_index=False)["proportional_distance"].sum()
-        proportional_distances.to_csv(output.mean_dist, sep="\t", index=False)
 

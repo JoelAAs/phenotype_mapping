@@ -41,7 +41,7 @@ def _format_to_line(gene, gene_dict, output, previous):
 
 
 def get_all_neighbours_at_depth(output_folder, gene_name, depth, graph):
-    print(f"getting paths for {gene_name} at depth {depth}")
+    print(f"Getting shortest possible paths from: {gene_name} at distance: {depth}")
 
     neighbours = _get_neighbours_at_depth(
         gene_name,

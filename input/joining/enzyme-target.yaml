@@ -1,9 +1,0 @@
-name: "enzyme-target"
-lists:
-  - "enzyme-target"
-  - "HPO-pruned"
-joining:
-    "data/hpo_med.csv"
-
-precentage_filtered: 0.9
-number_clusters: 3
