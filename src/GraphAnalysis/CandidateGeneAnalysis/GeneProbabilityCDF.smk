@@ -13,14 +13,6 @@ def get_components(wildcards):
     return expand(expected, component = comps)
 
 
-def get_unique_input(wc):
-    cluster_prob_ck = checkpoints.per_cluster_unique_input.get(**wc).output[0]
-    clusters, = glob_wildcards(os.path.join(cluster_prob_ck,"cluster_{cluster}.csv"))
-
-    path = f"work/{config['project_name']}/group-quant_{config['n_clusters']}/{{cluster}}_quant.csv"
-    return expand(path,cluster=clusters)
-
-
 rule get_CDF_of_genes:
     params:
         limit= config["combined_score_threshold"],
