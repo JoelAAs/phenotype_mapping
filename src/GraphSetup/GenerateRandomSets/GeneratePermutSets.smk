@@ -61,3 +61,4 @@ rule GeneratePermutationYaml:
             w.write(f"max_depth: {config['max_depth']}\n")
             w.write(f"n_path_batches: {config['n_path_batches']}\n")
             w.write(f"n_permutation_combinations: {config['n_permutation_combinations']}\n")
+            w.write(f"permutation_set: 1\n")

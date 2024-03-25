@@ -7,10 +7,19 @@ from scipy.stats import gumbel_r
 def get_components(wildcards):
     comp_check = checkpoints.get_connected_components.get(**wildcards).output[0]
     comps, = glob_wildcards(os.path.join(comp_check, "Component_{c}.csv"))
-    print(comps)
 
-    expected = f"work/{wildcards.project}/group-quant_{wildcards.n_cluster}/{wildcards.cluster}_connected_components_enrichment/Component_{{component}}_KEGG.png"
+
+    expected = f"work/{wildcards.project}/group-quant_{wildcards.n_clusters}/{wildcards.cluster}_connected_components_enrichment/Component_{{component}}_KEGG.png"
     return expand(expected, component = comps)
+
+
+def get_unique_input(wc):
+    cluster_prob_ck = checkpoints.per_cluster_unique_input.get(**wc).output[0]
+    clusters, = glob_wildcards(os.path.join(cluster_prob_ck,"cluster_{cluster}.csv"))
+
+    path = f"work/{config['project_name']}/group-quant_{config['n_clusters']}/{{cluster}}_quant.csv"
+    return expand(path,cluster=clusters)
+
 
 rule get_CDF_of_genes:
     params:
@@ -19,10 +28,10 @@ rule get_CDF_of_genes:
         n_permuts = config["n_permutation_combinations"]
     input:
         gene_probabilities = "work/{project}/candidate_genes/probabilities_{n_clusters}/cluster_{cluster}.csv",
-        set_permutations = "work/{permutation_project}/candidate_genes/cluster_gene_permutations_{{n_clusters}}/{{cluster}}_probability.csv".format(permutation_project=config["permutation_folder"])
+        set_permutations = "work/{permutation_project}/candidate_genes/cluster_gene_permutations_{{n_clusters}}/{{cluster}}_probability.csv".format(
+            permutation_project = config["permutation_folder"])
     output:
         quant = "work/{project}/group-quant_{n_clusters}/{cluster}_quant.csv"
-
     run:
         set_permut_dict = dict()
         with open(input.set_permutations, "r") as w:
@@ -97,7 +106,7 @@ rule get_top_values:
         keep_input = True
     input:
         cdf_scores = "work/{project}/group-quant_{n_clusters}/{cluster}_quant.csv",
-        unique_input="work/{project}/candidate_genes/probabilities_{n_clusters}/unique_input_{cluster}.csv"
+        unique_input="work/{project}/candidate_genes/unique_input_{n_clusters}/unique_input_{cluster}.csv"
     output:
         top_cdf_scores = "work/{project}/group-quant_{n_clusters}/{cluster}_top.csv"
     run:
@@ -154,7 +163,7 @@ rule remove_input_and_translate_to_entrez:
         entrez = "data/ncbi/entrez.csv",
         string_id = "data/stringdb/9606.protein.info.v11.5.txt"
     input:
-        unique_input = "work/{project}/candidate_genes/probabilities_{n_clusters}/unique_input_{cluster}.csv",
+        unique_input = "work/{project}/candidate_genes/unique_input_{n_clusters}/unique_input_{cluster}.csv",
         components = "work/{project}/group-quant_{n_clusters}/{cluster}_top_connected_components/Component_{component}.csv"
     output:
         translated = "work/{project}/group-quant_{n_clusters}/{cluster}_connected_components_enrichment/Component_{component}.csv",
@@ -195,7 +204,7 @@ rule enrichment_done_components:
     input:
         get_components
     output:
-        done = "work/{project}/group-quant_{n_clusters}/{group}_connected_components_enrichment/done.csv"
+        done = "work/{project}/group-quant_{n_clusters}/{cluster}_connected_components_enrichment/done.csv"
     shell:
         """
         touch {output.done}

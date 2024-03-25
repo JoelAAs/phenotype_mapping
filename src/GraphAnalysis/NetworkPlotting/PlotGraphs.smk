@@ -63,7 +63,6 @@ rule ClusterPlot:
         with open(output.check, "w") as w:
             w.write("check")
         for i, cluster_edge_file in enumerate(input):
-            print(input)
             cluster_graph_plot(
                 cluster_edge_file,
                 wildcards.project,
@@ -106,9 +105,9 @@ rule PlotEnrichment:
 
 rule PlotEnrichment_LCC:
     input:
-        enrichments = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}_KEGG.csv"
+        enrichments = "work/{project}/group-quant_{n_clusters}/{cluster}_connected_components_enrichment/Component_{component}_KEGG.csv"
     output:
-        figure = "work/full-drugbank-benchmark/group-quant/{group}_connected_components_enrichment/Component_{component}_KEGG.png"
+        figure = "work/{project}/group-quant_{n_clusters}/{cluster}_connected_components_enrichment/Component_{component}_KEGG.png"
     shell:
         """
         Rscript src/GraphAnalysis/NetworkPlotting/Enrichmentplot.R {input} {output}

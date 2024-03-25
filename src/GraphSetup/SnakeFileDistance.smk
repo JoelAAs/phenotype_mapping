@@ -49,7 +49,14 @@ if "permutation_folder" in config:
     output.append(permutation_config)
     include: "GenerateRandomSets/GeneratePermutSets.smk"
 
-output.append("work/{project}/term_to_term_probability_matrix.csv".format(project = config["project_name"]))
+if "permutation_set" in config:
+    prob = expand("work/{project}/neighborhood/{gene}_p_gene.csv.bz2",
+        project=config["project_name"],
+        gene=config["all_unique_genes"]
+    )
+    output += prob
+else:
+    output.append("work/{project}/term_to_term_probability_matrix.csv".format(project = config["project_name"]))
 
 
 include: "CalculatePossiblePaths/GetShortestPathNeighborhood.smk"

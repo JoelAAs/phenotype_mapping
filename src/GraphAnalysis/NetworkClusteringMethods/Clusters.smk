@@ -1,7 +1,6 @@
-from GraphKNN import GraphKNN
 from SCnormLapacian import sc_norm_lapacian
 
-rule SCnormLapacian:
+checkpoint SCnormLapacian:
     input:
         adj_list = "work/{project}/term_to_term_probability_matrix.csv"
     output:

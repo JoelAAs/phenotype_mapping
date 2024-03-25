@@ -31,10 +31,6 @@ def get_term_genesets(projects):
             expected_term_genests.append(f"input/{project}/{term}.csv")
     return list(set(expected_term_genests))
 
-def get_cluster_gene_probabilities(wc):
-    cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
-    clusters, = glob_wildcards(os.path.join(cluster_prob_ck, "cluster_{cluster}.csv"))
-    return expand(os.path.join(cluster_edge_ck, "cluster_{cluster}.csv"), cluster=clusters)
 
 def get_expected_enrichments(wc):
     cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
@@ -42,22 +38,18 @@ def get_expected_enrichments(wc):
     output_path = f"work/{wc.project}/plots/candidate_genes/enrichment/enrichment_{wc.n_clusters}/{wc.method}/enrichment_{{cluster}}.png"
     return expand(output_path, cluster = clusters)
 
-def get_expected_centrality(wc):
-    cluster_prob_ck = checkpoints.gene_in_cluster_probability_aggregation.get(**wc).output[0]
-    clusters, = glob_wildcards(os.path.join(cluster_prob_ck,"cluster_{cluster}.csv"))
-    output_path = f"work/{wc.project}/plots/candidate_genes/annotated/annotated_{wc.n_clusters}/annotated_{{cluster}}.png"
-    return expand(output_path,cluster=clusters)
 
 
-checkpoint gene_in_cluster_probability_aggregation:
+
+rule gene_in_cluster_probability_aggregation:
     input:
         genes_in_paths = get_gene_input(config["projects"]),
         term_genesets  = get_term_genesets(config["projects"]),
         cluster_file   = "work/{project}/clustering/SCnorm_{n_clusters}.csv"
     output:
-        directory("work/{project}/candidate_genes/probabilities_{n_clusters}/")
+        prob_dir = expand("work/{{project}}/candidate_genes/probabilities_{{n_clusters}}/cluster_{cluster}.csv",
+            cluster=range(config["n_clusters"]))
     run:
-        os.mkdir(output[0])
         cluster_dict = {}
         with open(input.cluster_file,"r") as f:
             lines = f.readlines()
@@ -70,7 +62,6 @@ checkpoint gene_in_cluster_probability_aggregation:
 
         for cluster in cluster_dict:
             probability_dict = dict()
-            unique_input_genes = set()
             for node in cluster_dict[cluster]:
                 print(f"Node: {node} for cluster {cluster}")
                 for project in config["projects"]:
@@ -81,7 +72,6 @@ checkpoint gene_in_cluster_probability_aggregation:
                 with open(f"input/{project_input}/{node}.csv", "r") as f:
                     genes = [l.strip() for l in f][1:]
                     for gene in genes:
-                        unique_input_genes += gene
                         with bz2.open(f"work/{project_input}/neighborhood/{gene}_p_gene.csv.bz2", "r") as f:
                             header= True
                             for line in f:
@@ -95,16 +85,47 @@ checkpoint gene_in_cluster_probability_aggregation:
                                     else:
                                         probability_dict[gene] = p_gene_path
 
-            with open(f"work/{wildcards.project}/candidate_genes/probabilities_{wildcards.n_clusters}/unique_input_{cluster}.csv", "w") as w:
-                w.write("gene\n")
-                for gene in unique_input_genes:
-                    w.write(f"{gene}\n")
-
             with open(f"work/{wildcards.project}/candidate_genes/probabilities_{wildcards.n_clusters}/cluster_{cluster}.csv", "w") as w:
                 w.write("gene\ty_probability\n")
                 for gene in probability_dict:
                     w.write(f"{gene}\t{probability_dict[gene]/len(cluster_dict[cluster])}\n")
 
+
+rule per_cluster_unique_input:
+    input:
+        term_genesets  = get_term_genesets(config["projects"]),
+        cluster_file   = "work/{project}/clustering/SCnorm_{n_clusters}.csv"
+    output:
+        unique_dir = expand("work/{{project}}/candidate_genes/unique_input_{{n_clusters}}/unique_input_{cluster}.csv",
+            cluster=range(config["n_clusters"]))
+    run:
+        cluster_dict = {}
+        with open(input.cluster_file,"r") as f:
+            lines = f.readlines()
+            for line in lines[1:]:
+                node, cluster = line.strip().split("\t")
+                if cluster in cluster_dict:
+                    cluster_dict[cluster].append(node)
+                else:
+                    cluster_dict[cluster] = [node]
+
+        for cluster in cluster_dict:
+            unique_input_genes = set()
+            for node in cluster_dict[cluster]:
+                for project in config["projects"]:
+                    if os.path.exists(f"input/{project}/{node}.csv"):
+                        project_input = project
+                        break
+
+                with open(f"input/{project_input}/{node}.csv", "r") as f:
+                    genes = [l.strip() for l in f][1:]
+                    for gene in genes:
+                        unique_input_genes.add(gene)
+
+            with open(f"work/{wildcards.project}/candidate_genes/unique_input_{wildcards.n_clusters}" + f"/unique_input_{cluster}.csv", "w") as w:
+                w.write("gene\n")
+                for gene in unique_input_genes:
+                    w.write(f"{gene}\n")
 
 rule get_stringid:
     params:
@@ -224,15 +245,6 @@ rule get_centrality_and_frequence:
             output.probability_annotatied_csv, sep="\t", index=False
         )
 
-rule get_centrality_and_frequnece_done:
-    input:
-        get_expected_centrality
-    output:
-        "work/{project}/plots/candidate_genes/annotated/annotated_{n_clusters}/done.txt"
-    shell:
-        """
-        touch {output}
-        """
 
 rule get_norm_term_to_term_matrix:
     input:
